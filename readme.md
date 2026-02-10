@@ -88,7 +88,7 @@ The app will be available at:
 ```
 the-shelf/
 ├── vercel.json                    # Vercel deployment config
-├── requirements.txt               # Python deps for Vercel runtime
+├── pyproject.toml                 # Python deps + version for Vercel runtime
 ├── api/
 │   └── index.py                   # Serverless entry point
 ├── docker-compose.yml
