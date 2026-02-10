@@ -18,18 +18,62 @@ A Goodreads alternative POC for tracking books, writing reviews, and rating cont
 
 - **Backend:** Python FastAPI + SQLAlchemy (async) + PostgreSQL
 - **Frontend:** React 18 + TypeScript + Tailwind CSS + Vite
-- **Containerization:** Docker Compose
+- **Deployment:** Vercel (serverless Python + static frontend)
 
-## Quick Start
+## Deploy to Vercel
+
+### Prerequisites
+
+- A [Vercel](https://vercel.com) account
+- A managed PostgreSQL database (e.g., [Neon](https://neon.tech), [Supabase](https://supabase.com), or [Vercel Postgres](https://vercel.com/docs/storage/vercel-postgres))
+
+### Steps
+
+1. Push this repo to GitHub
+2. Import the project in the [Vercel Dashboard](https://vercel.com/new)
+3. Set the following environment variables in Vercel project settings:
+
+| Variable | Value |
+|----------|-------|
+| `DATABASE_URL` | `postgresql+asyncpg://<user>:<pass>@<host>/<db>` |
+| `SECRET_KEY` | A random secret string for JWT signing |
+| `CORS_ORIGINS` | Your Vercel deployment URL (e.g., `https://the-shelf.vercel.app`) |
+
+4. Deploy — Vercel will automatically build the frontend and set up the API serverless function.
+
+### Seeding the database
+
+After deploying, you can seed the database by running the seed script locally against your managed database:
 
 ```bash
-# Clone and start
+cd backend
+DATABASE_URL="postgresql+asyncpg://<user>:<pass>@<host>/<db>" python -m app.seed
+```
+
+## Local Development
+
+### With Docker Compose
+
+```bash
 git clone <repo-url> && cd the-shelf
 cp .env.example .env
 docker compose up --build
 
 # Seed the database (in a separate terminal)
 docker compose exec backend python -m app.seed
+```
+
+### Without Docker
+
+```bash
+# Terminal 1: Backend
+cd backend
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
+
+# Terminal 2: Frontend
+cd frontend
+npm install && npm run dev
 ```
 
 The app will be available at:
@@ -43,6 +87,10 @@ The app will be available at:
 
 ```
 the-shelf/
+├── vercel.json                    # Vercel deployment config
+├── pyproject.toml                 # Python deps + version for Vercel runtime
+├── api/
+│   └── index.py                   # Serverless entry point
 ├── docker-compose.yml
 ├── backend/
 │   ├── Dockerfile
