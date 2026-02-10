@@ -9,17 +9,20 @@ export default function StarRating({ rating, size = 'md', interactive = false, o
   const sizeClass = size === 'sm' ? 'w-3.5 h-3.5' : size === 'lg' ? 'w-6 h-6' : 'w-5 h-5';
 
   return (
-    <div className="flex items-center">
+    <div className="flex items-center" role={interactive ? 'radiogroup' : undefined} aria-label={interactive ? 'Rate this book' : `Rating: ${rating.toFixed(1)} out of 5`}>
       {[1, 2, 3, 4, 5].map((star) => (
         <button
           key={star}
           type="button"
           disabled={!interactive}
           onClick={() => interactive && onRate?.(star)}
-          className={`${interactive ? 'cursor-pointer hover:scale-110' : 'cursor-default'} transition`}
+          className={`${interactive ? 'cursor-pointer hover:scale-125' : 'cursor-default'} transition-transform`}
+          aria-label={interactive ? `${star} star${star !== 1 ? 's' : ''}` : undefined}
+          role={interactive ? 'radio' : undefined}
+          aria-checked={interactive ? star === Math.round(rating) : undefined}
         >
           <svg
-            className={`${sizeClass} ${star <= Math.round(rating) ? 'text-yellow-400' : 'text-gray-300'}`}
+            className={`${sizeClass} ${star <= Math.round(rating) ? 'text-yellow-400' : 'text-gray-300 dark:text-gray-600'}`}
             fill="currentColor"
             viewBox="0 0 20 20"
           >
@@ -28,7 +31,7 @@ export default function StarRating({ rating, size = 'md', interactive = false, o
         </button>
       ))}
       {!interactive && (
-        <span className={`ml-1 ${size === 'sm' ? 'text-xs' : 'text-sm'} text-gray-600`}>
+        <span className={`ml-1 ${size === 'sm' ? 'text-xs' : 'text-sm'} text-gray-500 dark:text-gray-400`}>
           {rating.toFixed(1)}
         </span>
       )}

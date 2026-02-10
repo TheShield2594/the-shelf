@@ -10,15 +10,15 @@ function LevelBar({ label, icon, level }: { label: string; icon: string; level: 
 
   return (
     <div className="flex items-center space-x-3">
-      <span className="text-lg w-6 text-center">{icon}</span>
+      <span className="text-lg w-6 text-center" aria-hidden="true">{icon}</span>
       <div className="flex-1">
         <div className="flex justify-between text-sm mb-1">
-          <span className="text-gray-700">{label}</span>
+          <span className="text-gray-700 dark:text-gray-300">{label}</span>
           <span className={`px-2 py-0.5 rounded text-xs font-medium ${CONTENT_LEVEL_COLORS[rounded]}`}>
             {CONTENT_LEVEL_LABELS[rounded]}
           </span>
         </div>
-        <div className="w-full bg-gray-200 rounded-full h-2">
+        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
           <div
             className={`h-2 rounded-full transition-all ${
               rounded === 0 ? 'bg-green-400' :
@@ -27,6 +27,11 @@ function LevelBar({ label, icon, level }: { label: string; icon: string; level: 
               rounded === 3 ? 'bg-red-400' : 'bg-red-600'
             }`}
             style={{ width: `${Math.max(pct, 2)}%` }}
+            role="progressbar"
+            aria-valuenow={level}
+            aria-valuemin={0}
+            aria-valuemax={4}
+            aria-label={`${label}: ${CONTENT_LEVEL_LABELS[rounded]}`}
           />
         </div>
       </div>
@@ -36,10 +41,10 @@ function LevelBar({ label, icon, level }: { label: string; icon: string; level: 
 
 export default function ContentRatingDisplay({ rating }: Props) {
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-4">
+    <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="font-semibold text-gray-900">Content Ratings</h3>
-        <span className="text-xs text-gray-500">
+        <h3 className="font-semibold text-gray-900 dark:text-white">Content Ratings</h3>
+        <span className="text-xs text-gray-500 dark:text-gray-400">
           Based on {rating.count} rating{rating.count !== 1 ? 's' : ''} from readers
         </span>
       </div>
@@ -52,11 +57,11 @@ export default function ContentRatingDisplay({ rating }: Props) {
       </div>
 
       {rating.common_tags.length > 0 && (
-        <div className="mt-4 pt-3 border-t border-gray-100">
-          <p className="text-sm text-gray-600 mb-2">Content warnings:</p>
+        <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-800">
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Content warnings:</p>
           <div className="flex flex-wrap gap-1">
             {rating.common_tags.map((tag) => (
-              <span key={tag} className="bg-red-50 text-red-700 text-xs px-2 py-0.5 rounded">
+              <span key={tag} className="bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 text-xs px-2 py-0.5 rounded-full border border-red-200 dark:border-red-800">
                 {tag}
               </span>
             ))}

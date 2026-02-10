@@ -31,8 +31,8 @@ function LevelSlider({
   return (
     <div>
       <div className="flex justify-between mb-1">
-        <label className="text-sm font-medium text-gray-700">{label}</label>
-        <span className="text-sm text-gray-500">{CONTENT_LEVEL_LABELS[value]}</span>
+        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{label}</label>
+        <span className="text-sm text-gray-500 dark:text-gray-400">{CONTENT_LEVEL_LABELS[value]}</span>
       </div>
       <input
         type="range"
@@ -40,9 +40,10 @@ function LevelSlider({
         max={4}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-shelf-600"
+        className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-shelf-600"
+        aria-label={`${label}: ${CONTENT_LEVEL_LABELS[value]}`}
       />
-      <div className="flex justify-between text-xs text-gray-400 mt-0.5">
+      <div className="flex justify-between text-xs text-gray-400 dark:text-gray-500 mt-0.5">
         <span>None</span>
         <span>Graphic</span>
       </div>
@@ -74,22 +75,22 @@ export default function ContentRatingForm({ initial, onSubmit, loading }: Props)
       <LevelSlider label="Substance Use" value={substance} onChange={setSubstance} />
 
       <div>
-        <label className="text-sm font-medium text-gray-700 block mb-1">
+        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1">
           Additional Content Warnings
         </label>
-        <div className="flex space-x-2">
+        <div className="flex gap-2">
           <input
             type="text"
             value={tagInput}
             onChange={(e) => setTagInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
             placeholder="e.g., child death, animal harm..."
-            className="flex-1 border border-gray-300 rounded px-3 py-1.5 text-sm"
+            className="flex-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-shelf-400 outline-none"
           />
           <button
             type="button"
             onClick={addTag}
-            className="bg-gray-200 hover:bg-gray-300 px-3 py-1.5 rounded text-sm transition"
+            className="bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 px-3 py-1.5 rounded-lg text-sm transition"
           >
             Add
           </button>
@@ -97,13 +98,16 @@ export default function ContentRatingForm({ initial, onSubmit, loading }: Props)
         {tags.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-2">
             {tags.map((tag) => (
-              <span key={tag} className="bg-red-50 text-red-700 text-xs px-2 py-1 rounded flex items-center">
+              <span key={tag} className="bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 text-xs px-2 py-1 rounded-full border border-red-200 dark:border-red-800 flex items-center gap-1">
                 {tag}
                 <button
                   onClick={() => setTags(tags.filter((t) => t !== tag))}
-                  className="ml-1 text-red-400 hover:text-red-600"
+                  className="text-red-400 hover:text-red-600 dark:text-red-500 dark:hover:text-red-300"
+                  aria-label={`Remove ${tag}`}
                 >
-                  x
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
                 </button>
               </span>
             ))}
@@ -122,7 +126,7 @@ export default function ContentRatingForm({ initial, onSubmit, loading }: Props)
           })
         }
         disabled={loading}
-        className="w-full bg-shelf-600 hover:bg-shelf-700 text-white py-2 rounded font-medium transition disabled:opacity-50"
+        className="w-full bg-shelf-600 hover:bg-shelf-700 text-white py-2.5 rounded-lg font-medium transition disabled:opacity-50"
       >
         {loading ? 'Submitting...' : initial ? 'Update Content Rating' : 'Submit Content Rating'}
       </button>
