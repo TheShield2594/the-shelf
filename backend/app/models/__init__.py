@@ -5,6 +5,7 @@ from .user_book import UserBook
 from .review import Review
 from .related_book import RelatedBook
 from .content_rating import ContentRating
+from .multi_dimensional_rating import MultiDimensionalRating, BookFingerprint
 
 __all__ = [
     "User",
@@ -15,4 +16,6 @@ __all__ = [
     "Review",
     "RelatedBook",
     "ContentRating",
+    "MultiDimensionalRating",
+    "BookFingerprint",
 ]
