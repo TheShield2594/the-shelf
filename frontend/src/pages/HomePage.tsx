@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import { BookSummary, Genre, CONTENT_LEVEL_LABELS } from '../types';
 import BookCard from '../components/BookCard';
+import PopularBooksSection from '../components/PopularBooksSection';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { Button } from '../components/ui/Button';
@@ -80,6 +81,9 @@ export default function HomePage() {
           <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100 mb-2">The Shelf</h1>
           <p className="text-gray-600 dark:text-gray-400 text-lg">Discover your next great read</p>
         </div>
+
+        {/* Popular Books Section */}
+        <PopularBooksSection />
 
         {/* Open Library Search Section */}
         <div className="bg-gradient-to-br from-shelf-50 to-shelf-100 dark:from-shelf-900/30 dark:to-shelf-800/30 rounded-xl p-6 mb-8 border border-shelf-200 dark:border-shelf-700 shadow-sm">
