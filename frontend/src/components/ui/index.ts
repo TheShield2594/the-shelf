@@ -15,3 +15,4 @@ export {
   BookDetailSkeleton,
   ListItemSkeleton,
 } from './Skeleton';
+export { Tabs, TabsList, TabsTrigger, TabsContent } from './Tabs';
