@@ -32,6 +32,8 @@ class Book(Base):
     user_books: Mapped[list["UserBook"]] = relationship(back_populates="book")  # noqa: F821
     reviews: Mapped[list["Review"]] = relationship(back_populates="book", cascade="all, delete-orphan")  # noqa: F821
     content_ratings: Mapped[list["ContentRating"]] = relationship(back_populates="book", cascade="all, delete-orphan")  # noqa: F821
+    multi_dimensional_ratings: Mapped[list["MultiDimensionalRating"]] = relationship(back_populates="book", cascade="all, delete-orphan")  # noqa: F821
+    fingerprint: Mapped["BookFingerprint | None"] = relationship(back_populates="book", uselist=False, cascade="all, delete-orphan")  # noqa: F821
 
     related_to: Mapped[list["Book"]] = relationship(
         secondary="related_books",

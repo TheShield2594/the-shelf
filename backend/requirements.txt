@@ -9,3 +9,7 @@ passlib[bcrypt]==1.7.4
 httpx==0.28.1
 python-multipart==0.0.19
 pydantic-settings==2.7.0
+pgvector==0.3.6
+sentence-transformers==3.3.1
+scikit-learn==1.5.2
+numpy==2.0.2
