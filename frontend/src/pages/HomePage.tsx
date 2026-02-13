@@ -1,14 +1,17 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import { BookSummary, Genre, CONTENT_LEVEL_LABELS } from '../types';
 import BookCard from '../components/BookCard';
 
 export default function HomePage() {
+  const navigate = useNavigate();
   const [books, setBooks] = useState<BookSummary[]>([]);
   const [genres, setGenres] = useState<Genre[]>([]);
   const [search, setSearch] = useState('');
   const [selectedGenre, setSelectedGenre] = useState('');
   const [loading, setLoading] = useState(true);
+  const [openLibraryQuery, setOpenLibraryQuery] = useState('');
 
   // Content filters
   const [maxViolence, setMaxViolence] = useState<string>('');
@@ -72,11 +75,46 @@ export default function HomePage() {
     );
   }
 
+  const handleOpenLibrarySearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (openLibraryQuery.trim()) {
+      navigate(`/search?q=${encodeURIComponent(openLibraryQuery.trim())}`);
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Browse Books</h1>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">The Shelf</h1>
         <p className="text-gray-600">Discover your next great read</p>
+      </div>
+
+      {/* Open Library Search */}
+      <div className="bg-gradient-to-br from-shelf-50 to-shelf-100 rounded-xl p-6 mb-8 border border-shelf-200">
+        <h2 className="text-xl font-bold text-gray-900 mb-2">Search Open Library</h2>
+        <p className="text-gray-600 text-sm mb-4">
+          Search millions of books and import them to your library
+        </p>
+        <form onSubmit={handleOpenLibrarySearch} className="flex gap-2">
+          <input
+            type="text"
+            value={openLibraryQuery}
+            onChange={(e) => setOpenLibraryQuery(e.target.value)}
+            placeholder="Search by title, author, or ISBN..."
+            className="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-shelf-400 focus:border-shelf-400 outline-none"
+          />
+          <button
+            type="submit"
+            className="bg-shelf-500 text-white px-6 py-2.5 rounded-lg hover:bg-shelf-600 transition font-medium"
+          >
+            Search
+          </button>
+        </form>
+      </div>
+
+      {/* Browse Library Books */}
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold text-gray-900 mb-4">Browse Library Books</h2>
       </div>
 
       <div className="flex flex-col md:flex-row gap-4 mb-6">
