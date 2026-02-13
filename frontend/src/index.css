@@ -69,4 +69,39 @@
   .animate-slideOutRight {
     animation: slideOutRight var(--transition-base) ease-in;
   }
+
+  /* Scrollbar Styles */
+  .scrollbar-hide {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    height: 8px;
+  }
+
+  .scrollbar-thumb-shelf-400::-webkit-scrollbar-thumb {
+    background-color: rgb(234 179 127);
+    border-radius: 4px;
+  }
+
+  .scrollbar-track-shelf-100::-webkit-scrollbar-track {
+    background-color: rgb(254 248 242);
+  }
+
+  .dark .scrollbar-thumb-shelf-600::-webkit-scrollbar-thumb {
+    background-color: rgb(180 93 28);
+  }
+
+  .dark .scrollbar-track-shelf-800::-webkit-scrollbar-track {
+    background-color: rgb(92 42 8);
+  }
 }

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import PopularBooksSection from '../components/PopularBooksSection';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
 
@@ -22,6 +23,9 @@ export default function HomePage() {
           <h1 className="text-5xl font-bold text-gray-900 dark:text-gray-100 mb-4">The Shelf</h1>
           <p className="text-gray-600 dark:text-gray-400 text-xl">Discover your next great read</p>
         </div>
+
+        {/* Popular Books Section */}
+        <PopularBooksSection />
 
         {/* Open Library Search Section */}
         <div className="bg-gradient-to-br from-shelf-50 to-shelf-100 dark:from-shelf-900/30 dark:to-shelf-800/30 rounded-xl p-8 border border-shelf-200 dark:border-shelf-700 shadow-lg">
