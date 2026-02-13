@@ -1,5 +1,8 @@
 import datetime
 from pydantic import BaseModel
+from typing import Optional
+
+from .multi_dimensional_rating import BookFingerprintResponse
 
 
 class GenreOut(BaseModel):
@@ -50,6 +53,7 @@ class BookOut(BaseModel):
     avg_rating: float | None = None
     rating_count: int = 0
     content_rating: ContentRatingAvg | None = None
+    fingerprint: Optional[BookFingerprintResponse] = None  # Multi-dimensional ratings
 
     model_config = {"from_attributes": True}
 
@@ -63,6 +67,7 @@ class BookSummary(BaseModel):
     avg_rating: float | None = None
     rating_count: int = 0
     content_rating: ContentRatingAvg | None = None
+    fingerprint: Optional[BookFingerprintResponse] = None  # Multi-dimensional ratings
 
     model_config = {"from_attributes": True}
 

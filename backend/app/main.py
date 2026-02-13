@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
 from .database import engine, Base
-from .routers import auth, books, genres, library, reviews, content_ratings
+from .routers import auth, books, genres, library, reviews, content_ratings, multi_dimensional_ratings
 
 
 @asynccontextmanager
@@ -31,6 +31,7 @@ app.include_router(genres.router)
 app.include_router(library.router)
 app.include_router(reviews.router)
 app.include_router(content_ratings.router)
+app.include_router(multi_dimensional_ratings.router)
 
 
 @app.get("/api/health")
