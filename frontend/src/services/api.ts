@@ -47,7 +47,7 @@ export const api = {
   getBook: (id: number) => request<import('../types').BookDetail>(`/api/books/${id}`),
 
   createBook: (data: Record<string, unknown>) =>
-    request('/api/books', { method: 'POST', body: JSON.stringify(data) }),
+    request<import('../types').BookDetail>('/api/books', { method: 'POST', body: JSON.stringify(data) }),
 
   importBook: (data: { query: string; isbn: boolean }) =>
     request('/api/books/import', { method: 'POST', body: JSON.stringify(data) }),
