@@ -2,16 +2,20 @@ import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { searchBooks, searchBooksByISBN, OpenLibraryBook, getCoverUrl, getBookId } from '../lib/open-library';
 import { api } from '../services/api';
+import { BookDetail } from '../types';
+import { useAuth } from '../context/AuthContext';
 
 export default function SearchPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const query = searchParams.get('q') || '';
   const isISBN = searchParams.get('isbn') === 'true';
 
   const [books, setBooks] = useState<OpenLibraryBook[]>([]);
   const [loading, setLoading] = useState(true);
   const [importing, setImporting] = useState<string | null>(null);
+  const [importedBookIds, setImportedBookIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!query) {
@@ -39,6 +43,18 @@ export default function SearchPage() {
 
   const handleImport = async (book: OpenLibraryBook) => {
     const bookId = getBookId(book);
+
+    // Check if user is authenticated
+    if (!user) {
+      navigate('/login?redirect=/search?q=' + encodeURIComponent(query));
+      return;
+    }
+
+    // Prevent duplicate imports
+    if (importedBookIds.has(bookId)) {
+      return;
+    }
+
     setImporting(bookId);
 
     try {
@@ -47,12 +63,16 @@ export default function SearchPage() {
         author: book.author_name?.[0] || 'Unknown Author',
         isbn: book.isbn?.[0] || null,
         cover_url: getCoverUrl(book.cover_i, 'L'),
-        publication_date: book.first_publish_year ? `${book.first_publish_year}-01-01` : null,
+        publication_year: book.first_publish_year || null,
         description: null,
       };
 
-      const newBook = await api.createBook(bookData);
-      navigate(`/books/${(newBook as any).id}`);
+      const newBook: BookDetail = await api.createBook(bookData);
+
+      // Mark as imported to prevent duplicates
+      setImportedBookIds(prev => new Set(prev).add(bookId));
+
+      navigate(`/books/${newBook.id}`);
     } catch (error: any) {
       alert(error.message || 'Failed to import book');
     } finally {
@@ -122,11 +142,18 @@ export default function SearchPage() {
                     <p className="text-xs text-gray-400 mb-2">{book.first_publish_year}</p>
                   )}
                   <button
+                    type="button"
                     onClick={() => handleImport(book)}
-                    disabled={importing === bookId}
+                    disabled={importing === bookId || importedBookIds.has(bookId)}
                     className="w-full bg-shelf-500 text-white text-xs py-1.5 rounded hover:bg-shelf-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition"
                   >
-                    {importing === bookId ? 'Importing...' : 'Import Book'}
+                    {importing === bookId
+                      ? 'Importing...'
+                      : importedBookIds.has(bookId)
+                      ? 'Imported ✓'
+                      : user
+                      ? 'Import Book'
+                      : 'Login to Import'}
                   </button>
                 </div>
               </div>

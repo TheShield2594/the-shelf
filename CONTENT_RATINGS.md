@@ -87,9 +87,11 @@ class ContentRating(Base):
 ```
 
 **API Endpoints**:
-- `POST /api/books/{id}/content-ratings` - Submit a rating
-- `GET /api/books/{id}/content-ratings/summary` - Get aggregated ratings
-- `GET /api/books?max_violence=2&max_language=1` - Filter by content
+- `POST /api/content-ratings` - Submit a rating (book_id in request body)
+- `GET /api/content-ratings/book/{book_id}` - Get individual ContentRating records
+- `GET /api/books?max_violence=2&max_language=1&max_sexual=1&max_substance=2` - Filter books by content levels
+
+**Note**: Aggregated content rating summaries are included in the book summary objects returned by the books endpoints (e.g., `GET /api/books`), not via a separate content-ratings summary endpoint.
 
 ### Frontend Usage
 
@@ -97,7 +99,8 @@ class ContentRating(Base):
 ```typescript
 import { api } from '@/services/api';
 
-await api.createContentRating(bookId, {
+await api.createContentRating({
+  book_id: bookId,
   violence_level: 2,
   language_level: 1,
   sexual_content_level: 0,
@@ -105,7 +108,13 @@ await api.createContentRating(bookId, {
 });
 ```
 
-**Filter books**:
+**Get ratings for a book**:
+```typescript
+const ratings = await api.getContentRatings(bookId);
+// Returns array of individual ContentRating records
+```
+
+**Filter books by content levels**:
 ```typescript
 const books = await api.getBooks({
   max_violence: '2',
@@ -113,6 +122,7 @@ const books = await api.getBooks({
   max_sexual: '1',
   max_substance: '2',
 });
+// Aggregated content ratings are included in each book summary
 ```
 
 ## Enhancing Community Ratings

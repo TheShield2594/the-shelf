@@ -25,16 +25,18 @@ Common Sense Media provides expert-reviewed content ratings for books, helping p
 
 ### 2. Configure the Application
 
-Add your API key to the frontend environment:
+⚠️ **Security**: Never expose API keys in frontend code or environment variables starting with `VITE_`.
+
+Add your API key to the **backend** environment only:
 
 ```bash
-# frontend/.env
-VITE_CSM_API_KEY=your_api_key_here
+# backend/.env
+CSM_API_KEY=your_api_key_here
 ```
 
 ### 3. API Specifications
 
-- **Base URL**: `https://api.commonsensemedia.org/v3`
+- **Base URL**: `https://api.commonsense.org/api/v3`
 - **Authentication**: API key via `x-api-key` header
 - **Rate Limit**: 100 unique requests per minute
 - **Protocol**: HTTPS only
@@ -51,16 +53,61 @@ VITE_CSM_API_KEY=your_api_key_here
 
 ## Usage
 
+### Architecture: Backend Proxy
+
+🔒 **Security First**: CSM API calls **must** go through your backend to protect the API key.
+
+**Flow**:
+1. Frontend calls backend endpoint (e.g., `/api/csm/search`)
+2. Backend authenticates the request
+3. Backend calls CSM API using server-side `CSM_API_KEY`
+4. Backend returns CSM data to frontend
+
+### Backend Implementation
+
+**Create a CSM proxy endpoint** (`/backend/app/routers/csm.py`):
+
+```python
+from fastapi import APIRouter, HTTPException, Depends
+import httpx
+import os
+
+router = APIRouter(prefix="/csm", tags=["csm"])
+CSM_API_KEY = os.getenv("CSM_API_KEY")
+CSM_BASE_URL = "https://api.commonsense.org/api/v3"
+
+@router.get("/search")
+async def search_csm_review(q: str, current_user = Depends(get_current_user)):
+    """Proxy CSM review search to protect API key"""
+    if not CSM_API_KEY:
+        raise HTTPException(503, "CSM API not configured")
+
+    async with httpx.AsyncClient() as client:
+        response = await client.get(
+            f"{CSM_BASE_URL}/reviews/search",
+            params={"q": q, "type": "book"},
+            headers={"x-api-key": CSM_API_KEY}
+        )
+        response.raise_for_status()
+        return response.json()
+```
+
 ### Frontend Integration
 
-The CSM service is already implemented in `/frontend/src/services/commonSenseMedia.ts`.
+**Call the backend proxy** (update `/frontend/src/services/commonSenseMedia.ts`):
 
-**Check if CSM is configured**:
 ```typescript
-import { isCSMConfigured } from '@/services/commonSenseMedia';
-
-if (isCSMConfigured()) {
-  // CSM features are available
+// Frontend calls backend, NOT CSM directly
+export async function searchCSMReview(query: string): Promise<CSMReview | null> {
+  try {
+    const response = await fetch(`/api/csm/search?q=${encodeURIComponent(query)}`);
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data.results?.[0] || null;
+  } catch (error) {
+    console.error('CSM API request failed:', error);
+    return null;
+  }
 }
 ```
 
@@ -76,42 +123,44 @@ if (rating) {
 }
 ```
 
-**Bulk fetch for periodic updates**:
-```typescript
-import { bulkFetchCSMRatings } from '@/services/commonSenseMedia';
+### Scheduled Sync (Required by CSM)
 
-const books = [
-  { title: "Harry Potter", author: "J.K. Rowling" },
-  { title: "The Hunger Games", author: "Suzanne Collins" },
-];
-
-const ratings = await bulkFetchCSMRatings(books);
-```
-
-### Backend Integration
-
-You can create a scheduled job to periodically fetch CSM ratings:
+Create a scheduled job to periodically fetch and store CSM ratings:
 
 ```python
-# backend/app/tasks/csm_sync.py (example)
+# backend/app/tasks/csm_sync.py
 import httpx
+import os
 from app.models.book import Book
 from app.models.content_rating import ContentRating
 from app.database import get_db
+
+CSM_API_KEY = os.getenv("CSM_API_KEY")
+CSM_BASE_URL = "https://api.commonsense.org/api/v3"
 
 async def sync_csm_ratings():
     """
     Periodically fetch CSM ratings for all books
     Run this as a scheduled task (e.g., weekly)
     """
-    async with get_db() as db:
-        books = await db.execute(select(Book).limit(100))
-        for book in books.scalars():
-            # Fetch from CSM API
-            rating = await fetch_csm_rating(book.title, book.author)
-            if rating:
-                # Store in database
-                await store_csm_rating(db, book.id, rating)
+    if not CSM_API_KEY:
+        return
+
+    async with httpx.AsyncClient() as client:
+        async with get_db() as db:
+            books = await db.execute(select(Book).limit(100))
+            for book in books.scalars():
+                # Fetch from CSM API
+                response = await client.get(
+                    f"{CSM_BASE_URL}/reviews/search",
+                    params={"q": f"{book.title} {book.author}", "type": "book"},
+                    headers={"x-api-key": CSM_API_KEY}
+                )
+                if response.status_code == 200:
+                    data = response.json()
+                    # Store in database
+                    await store_csm_rating(db, book.id, data)
+                await asyncio.sleep(0.65)  # Rate limiting
 ```
 
 ## Rating Scale Conversion

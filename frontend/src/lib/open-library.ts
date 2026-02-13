@@ -1,5 +1,25 @@
 const BASE_URL = "https://openlibrary.org";
 
+// Common query fields to avoid duplication
+const SEARCH_FIELDS = "key,title,author_name,cover_i,first_publish_year,subject,isbn,number_of_pages_median,ratings_average";
+const BASIC_FIELDS = "key,title,author_name,cover_i,first_publish_year,subject,isbn";
+
+/**
+ * Helper to fetch JSON and handle errors
+ */
+async function fetchJson<T>(url: string): Promise<T> {
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => response.statusText);
+    throw new Error(
+      `Open Library API error: ${response.status} ${response.statusText}. ${text}`
+    );
+  }
+
+  return response.json();
+}
+
 export interface OpenLibraryBook {
   key: string;
   title: string;
@@ -35,39 +55,31 @@ export function getCoverUrl(coverId: number | undefined, size: "S" | "M" | "L" =
 }
 
 export async function searchBooks(query: string, limit = 20): Promise<OpenLibraryBook[]> {
-  const res = await fetch(
-    `${BASE_URL}/search.json?q=${encodeURIComponent(query)}&limit=${limit}&fields=key,title,author_name,cover_i,first_publish_year,subject,isbn,number_of_pages_median,ratings_average`
-  );
-  const data = await res.json();
+  const url = `${BASE_URL}/search.json?q=${encodeURIComponent(query)}&limit=${limit}&fields=${SEARCH_FIELDS}`;
+  const data = await fetchJson<{ docs: OpenLibraryBook[] }>(url);
   return data.docs || [];
 }
 
 export async function searchBooksByISBN(isbn: string): Promise<OpenLibraryBook[]> {
-  const res = await fetch(
-    `${BASE_URL}/search.json?isbn=${encodeURIComponent(isbn)}&limit=5&fields=key,title,author_name,cover_i,first_publish_year,subject,isbn,number_of_pages_median,ratings_average`
-  );
-  const data = await res.json();
+  const url = `${BASE_URL}/search.json?isbn=${encodeURIComponent(isbn)}&limit=5&fields=${SEARCH_FIELDS}`;
+  const data = await fetchJson<{ docs: OpenLibraryBook[] }>(url);
   return data.docs || [];
 }
 
 export async function searchBooksBySubject(subject: string, limit = 12): Promise<OpenLibraryBook[]> {
-  const res = await fetch(
-    `${BASE_URL}/search.json?subject=${encodeURIComponent(subject)}&limit=${limit}&fields=key,title,author_name,cover_i,first_publish_year,subject,isbn`
-  );
-  const data = await res.json();
+  const url = `${BASE_URL}/search.json?subject=${encodeURIComponent(subject)}&limit=${limit}&fields=${BASIC_FIELDS}`;
+  const data = await fetchJson<{ docs: OpenLibraryBook[] }>(url);
   return data.docs || [];
 }
 
 export async function getBookDetails(workKey: string): Promise<BookDetails> {
-  const res = await fetch(`${BASE_URL}${workKey}.json`);
-  return res.json();
+  const url = `${BASE_URL}${workKey}.json`;
+  return fetchJson<BookDetails>(url);
 }
 
 export async function getTrendingBooks(limit = 12): Promise<OpenLibraryBook[]> {
-  const res = await fetch(
-    `${BASE_URL}/search.json?q=*&sort=rating&limit=${limit}&fields=key,title,author_name,cover_i,first_publish_year,subject,isbn,ratings_average`
-  );
-  const data = await res.json();
+  const url = `${BASE_URL}/search.json?q=*:*&sort=rating&limit=${limit}&fields=${SEARCH_FIELDS}`;
+  const data = await fetchJson<{ docs: OpenLibraryBook[] }>(url);
   return data.docs || [];
 }
 
@@ -91,6 +103,7 @@ export function convertToBackendFormat(olBook: OpenLibraryBook) {
     isbn: olBook.isbn?.[0] || null,
     description: null, // Will need to fetch details for description
     cover_url: getCoverUrl(olBook.cover_i, "L"),
-    publication_date: olBook.first_publish_year ? `${olBook.first_publish_year}-01-01` : null,
+    publication_year: olBook.first_publish_year || null,
+    publication_date_precision: olBook.first_publish_year ? 'year' : null,
   };
 }
