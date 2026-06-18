@@ -8,7 +8,7 @@ This guide covers deploying The Shelf to production using modern hosting platfor
 
 ```
 ┌─────────────────┐
-│  Vercel (CDN)   │  ← Frontend (Next.js 14)
+│  Frontend (CDN) │  ← Frontend (Next.js 14)
 │  theshelf.app   │     Port 443 (HTTPS)
 └────────┬────────┘
          │
@@ -34,7 +34,7 @@ This guide covers deploying The Shelf to production using modern hosting platfor
 Before deploying, ensure you have:
 
 - ✅ GitHub repository with your code
-- ✅ Vercel account (free tier works)
+- ✅ Hosting provider account for your frontend (free tier works)
 - ✅ Railway or Fly.io account (free tier works)
 - ✅ Neon or Supabase account (free tier works)
 - ✅ Domain name (optional but recommended)
@@ -139,7 +139,7 @@ If you prefer Supabase:
    ```bash
    DATABASE_URL=postgresql://...  # From Neon
    SECRET_KEY=<generate-random-256-bit-key>
-   CORS_ORIGINS=https://your-vercel-app.vercel.app,https://yourdomain.com
+   CORS_ORIGINS=https://your-frontend-domain.com,https://yourdomain.com
    PORT=8000
    ```
 
@@ -175,61 +175,7 @@ If you prefer Fly.io:
 
 ---
 
-## Step 3: Frontend Deployment (Vercel)
-
-### Why Vercel?
-
-- ✅ Built for Next.js (same company)
-- ✅ Free tier (generous)
-- ✅ Automatic HTTPS
-- ✅ Global CDN
-- ✅ Preview deployments
-- ✅ Custom domains
-
-### Setup Instructions
-
-1. **Create Vercel Account**
-   - Visit [vercel.com](https://vercel.com)
-   - Sign up with GitHub
-
-2. **Import Project**
-   - Click "New Project"
-   - Import your `the-shelf` repository
-   - Vercel detects Next.js automatically
-
-3. **Configure Build Settings**
-
-   - **Root Directory:** `frontend-next`
-   - **Framework:** Next.js
-   - **Build Command:** `npm run build` (auto-detected)
-   - **Output Directory:** `.next` (auto-detected)
-
-4. **Set Environment Variables**
-
-   In Vercel dashboard → Settings → Environment Variables:
-   ```bash
-   NEXT_PUBLIC_API_URL=https://your-backend.railway.app
-   ```
-
-   Important: Must start with `NEXT_PUBLIC_` to be available in browser
-
-5. **Deploy**
-   - Click "Deploy"
-   - Vercel will build and deploy
-   - Takes ~2-3 minutes
-
-6. **Get Frontend URL**
-   - Vercel generates a URL like `the-shelf.vercel.app`
-   - Or set up custom domain (e.g., `theshelf.app`)
-
-7. **Test Frontend**
-   - Visit your Vercel URL
-   - Navigate to `/demo`
-   - Try rating a book (will fail until database is set up)
-
----
-
-## Step 4: Database Migration
+## Step 3: Database Migration
 
 Now that backend is deployed, run migrations:
 
@@ -286,18 +232,7 @@ This creates demo data for testing.
 
 ---
 
-## Step 5: Custom Domain Setup
-
-### Frontend (Vercel)
-
-1. Go to Vercel dashboard → Settings → Domains
-2. Click "Add Domain"
-3. Enter your domain (e.g., `theshelf.app`)
-4. Follow DNS configuration instructions:
-   - Add A record: `76.76.21.21`
-   - Add CNAME: `cname.vercel-dns.com`
-5. Wait for DNS propagation (~5-60 minutes)
-6. Vercel will automatically provision SSL certificate
+## Step 4: Custom Domain Setup
 
 ### Backend (Railway)
 
@@ -318,19 +253,13 @@ CORS_ORIGINS=https://theshelf.app,https://www.theshelf.app
 
 ---
 
-## Step 6: Monitoring & Logging
+## Step 5: Monitoring & Logging
 
 ### Backend Monitoring (Railway)
 
 - **Logs:** Railway dashboard → Logs tab (real-time)
 - **Metrics:** Railway dashboard → Metrics (CPU, memory, network)
 - **Alerts:** Set up in Settings → Notifications
-
-### Frontend Monitoring (Vercel)
-
-- **Analytics:** Vercel dashboard → Analytics
-- **Logs:** Vercel dashboard → Deployments → Click deployment → Logs
-- **Performance:** Built-in Core Web Vitals tracking
 
 ### Error Tracking (Sentry)
 
@@ -350,15 +279,14 @@ Optional but recommended:
    npm install @sentry/nextjs
    npx @sentry/wizard -i nextjs
    ```
-6. Add environment variable in Vercel: `NEXT_PUBLIC_SENTRY_DSN=https://...`
+6. Add environment variable in your frontend host: `NEXT_PUBLIC_SENTRY_DSN=https://...`
 
 ---
 
-## Step 7: SSL & Security
+## Step 6: SSL & Security
 
 ### SSL Certificates
 
-- ✅ Vercel: Automatic SSL (Let's Encrypt)
 - ✅ Railway: Automatic SSL
 - ✅ Neon: SSL required by default
 
@@ -439,7 +367,7 @@ app.add_middleware(
 
 ### Frontend
 
-- [ ] Vercel project created
+- [ ] Hosting provider project created
 - [ ] Root directory set to `frontend-next`
 - [ ] Environment variable `NEXT_PUBLIC_API_URL` set
 - [ ] Build successful
@@ -473,25 +401,17 @@ app.add_middleware(
 - ✅ Auto-sleep after inactivity
 - **Upgrade:** Pay-as-you-go after credit
 
-**Vercel (Frontend):**
-- ✅ 100 GB bandwidth/month
-- ✅ Unlimited deployments
-- ✅ Custom domains
-- **Upgrade:** $20/month for team features
-
 ### Estimated Monthly Cost
 
 **MVP (< 1000 users):**
 - Database: $0 (free tier)
 - Backend: $0-5 (Railway credit)
-- Frontend: $0 (free tier)
 - **Total: $0-5/month**
 
 **Growth (1000-10,000 users):**
 - Database: $19 (Neon Pro)
 - Backend: $20-50 (Railway)
-- Frontend: $0 (still free)
-- **Total: $40-70/month**
+- **Total: $39-69/month**
 
 ---
 
@@ -516,12 +436,12 @@ Failed to fetch from http://localhost:8000
 ```
 
 **Solutions:**
-1. Check `NEXT_PUBLIC_API_URL` is set in Vercel
+1. Check `NEXT_PUBLIC_API_URL` is set in your frontend host's environment variables
 2. Ensure backend URL is HTTPS, not HTTP
 3. Verify CORS settings in backend
 4. Check browser console for CORS errors
 
-### Build Failed on Vercel
+### Frontend Build Failed
 
 ```
 Error: Cannot find module 'next'
@@ -529,7 +449,7 @@ Error: Cannot find module 'next'
 
 **Solutions:**
 1. Ensure `package.json` is in `frontend-next/`
-2. Set root directory to `frontend-next` in Vercel settings
+2. Set root directory to `frontend-next` in your frontend host's settings
 3. Check Node.js version (should be 18+)
 4. Verify `npm install` runs locally
 
@@ -549,29 +469,24 @@ Error: Build exceeded 10-minute limit
 
 ## Continuous Deployment
 
-Both Vercel and Railway support automatic deployments:
+Both your frontend host and Railway support automatic deployments:
 
 **Push to GitHub → Automatic Deploy**
 
 1. Make changes locally
 2. Commit: `git commit -m "Update feature"`
 3. Push: `git push origin main`
-4. Vercel and Railway automatically deploy
+4. Your frontend host and Railway automatically deploy
 5. Check deployment logs for success
 
-**Preview Deployments (Vercel):**
-- Every PR gets a unique preview URL
-- Test before merging to main
-
 **Rollback:**
-- Vercel: Dashboard → Deployments → Click previous → Promote
 - Railway: Dashboard → Deployments → Redeploy previous
 
 ---
 
 ## Performance Optimization
 
-### Frontend (Vercel)
+### Frontend (static/Next.js host)
 
 1. **Image Optimization**
    ```tsx
@@ -619,11 +534,11 @@ Both Vercel and Railway support automatic deployments:
    - Test on mobile
 
 2. **Set Up Analytics**
-   - Vercel Analytics (built-in)
+   - Your frontend's analytics (built-in)
    - Google Analytics (optional)
 
 3. **Monitor Performance**
-   - Check Core Web Vitals in Vercel
+   - Check Core Web Vitals in your frontend's analytics
    - Monitor API response times in Railway
 
 4. **Gather Feedback**
@@ -639,7 +554,6 @@ Both Vercel and Railway support automatic deployments:
 
 ## Support
 
-- **Vercel Docs:** https://vercel.com/docs
 - **Railway Docs:** https://docs.railway.app
 - **Neon Docs:** https://neon.tech/docs
 - **Next.js Docs:** https://nextjs.org/docs
@@ -649,4 +563,4 @@ Both Vercel and Railway support automatic deployments:
 
 **Your app is now live! 🚀**
 
-Visit your Vercel URL and start tracking books with multi-dimensional ratings!
+Visit your deployed frontend URL and start tracking books with multi-dimensional ratings!

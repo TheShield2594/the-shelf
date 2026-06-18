@@ -523,7 +523,7 @@ BookContentAggregate (Aggregated Content Ratings)
 - Image optimization out of the box
 - SEO-friendly (book pages should be indexable)
 - Edge middleware for auth
-- Easy Vercel deployment
+- Easy to deploy on most modern hosting providers
 - Still uses React under the hood (easy migration)
 
 **Migration plan:**
@@ -548,9 +548,8 @@ BookContentAggregate (Aggregated Content Ratings)
 - Can run async alongside FastAPI
 - Easy to iterate on
 
-#### Hosting: **Vercel (Frontend) + Railway/Fly.io (Backend)** ✅ (Keep Vercel for FE)
+#### Hosting: **Frontend host (static/Next.js) + Railway/Fly.io (Backend)**
 **Why:**
-- Vercel: Best-in-class DX for Next.js
 - Railway/Fly: Better for long-running processes (recommendation engine)
 - Both have good free tiers
 - Easy to scale
@@ -813,7 +812,7 @@ Related Tab:
 **Week 8: Testing & Deployment**
 - [ ] E2E testing (Playwright)
 - [ ] Performance optimization
-- [ ] Deploy to production (Vercel + Railway)
+- [ ] Deploy to production (frontend host + Railway)
 - [ ] Set up monitoring (Sentry)
 
 ### Phase 3: Advanced Features (Weeks 9-12)

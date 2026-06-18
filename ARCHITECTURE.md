@@ -736,16 +736,10 @@ GET    /api/analytics/genres       Genre breakdown over time
 
 ```
 ┌────────────────────────────────────────────────────────┐
-│  Vercel Edge Network (CDN)                             │
+│  Frontend (static/Next.js host)                        │
 │  - Next.js static assets                               │
 │  - Edge middleware (auth, rate limiting)               │
 │  - Server components rendered on demand                │
-└────────────┬───────────────────────────────────────────┘
-             │
-             ▼
-┌────────────────────────────────────────────────────────┐
-│  Vercel Serverless Functions (optional)                │
-│  - /api routes (if needed for server-side logic)       │
 └────────────┬───────────────────────────────────────────┘
              │
              │ HTTPS
@@ -804,7 +798,7 @@ ENABLE_EMBEDDINGS=true
 **MVP (< 1000 users):**
 - Single FastAPI instance (Railway/Fly.io)
 - Shared PostgreSQL (Neon free tier)
-- Vercel free tier for frontend
+- Free tier hosting for frontend
 - **Cost:** $0-20/month
 
 **Growth (1000-10,000 users):**
@@ -902,7 +896,7 @@ logger.info("user_registered", user_id=user.id, email=user.email)
 logger.error("recommendation_failed", user_id=user.id, error=str(e))
 ```
 
-**Next.js (Console + Vercel Logs)**
+**Next.js (Console + frontend host logs)**
 ```typescript
 console.log('[API] Fetching books', { query, filters });
 console.error('[API] Failed to fetch books', error);
@@ -933,7 +927,7 @@ Sentry.init({ dsn: process.env.NEXT_PUBLIC_SENTRY_DSN });
 - Error rate
 
 **Tools:**
-- Vercel Analytics (frontend)
+- Your frontend's analytics
 - Railway/Fly.io metrics (backend)
 - Sentry Performance Monitoring
 - PostgreSQL slow query log
