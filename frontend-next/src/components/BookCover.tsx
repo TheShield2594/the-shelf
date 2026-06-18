@@ -10,7 +10,7 @@ interface BookCoverProps {
 }
 
 const sizeClasses = {
-  sm: 'w-20 h-30',
+  sm: 'w-20 h-28',
   md: 'w-32 h-48',
   lg: 'w-40 h-60',
   xl: 'w-56 h-80',

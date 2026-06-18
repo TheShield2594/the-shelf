@@ -29,9 +29,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (token) {
       api.getCurrentUser()
         .then(setUser)
-        .catch(() => {
-          localStorage.removeItem('auth_token');
-          api.clearToken();
+        .catch((err: any) => {
+          // Only clear auth state on 401 (actual auth failure), not transient errors
+          if (err?.status === 401) {
+            localStorage.removeItem('auth_token');
+            api.clearToken();
+          }
         })
         .finally(() => setLoading(false));
     } else {

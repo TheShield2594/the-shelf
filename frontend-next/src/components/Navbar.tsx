@@ -122,7 +122,7 @@ export function Navbar() {
               </Link>
             ))}
             <div className="border-t border-stone-200 dark:border-gray-800 mt-2 pt-2">
-              {user ? (
+              {loading ? null : user ? (
                 <div className="flex flex-col gap-1">
                   <Link href="/profile" onClick={() => setMenuOpen(false)} className="px-3 py-2 rounded-lg text-sm font-medium text-stone-600 dark:text-gray-400 hover:bg-stone-100 dark:hover:bg-gray-800">{user.username}</Link>
                   <button onClick={() => { handleLogout(); setMenuOpen(false); }} className="px-3 py-2 rounded-lg text-sm font-medium text-left text-stone-600 dark:text-gray-400 hover:bg-stone-100 dark:hover:bg-gray-800">Logout</button>

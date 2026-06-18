@@ -25,6 +25,7 @@ export function StarRating({ value, onChange, size = 'md', readOnly = false }: S
           onClick={() => onChange?.(star)}
           onMouseEnter={() => !readOnly && setHover(star)}
           onMouseLeave={() => !readOnly && setHover(null)}
+          aria-label={`Rate ${star} star${star !== 1 ? 's' : ''}`}
           className={`${readOnly ? 'cursor-default' : 'cursor-pointer'} transition-transform ${!readOnly ? 'hover:scale-110' : ''}`}
         >
           <svg
