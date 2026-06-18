@@ -1,5 +1,7 @@
 'use client';
 
+import { useState } from 'react';
+
 interface BookCoverProps {
   coverUrl?: string;
   title: string;
@@ -46,5 +48,3 @@ export function BookCover({ coverUrl, title, author, size = 'md' }: BookCoverPro
     </div>
   );
 }
-
-import { useState } from 'react';
