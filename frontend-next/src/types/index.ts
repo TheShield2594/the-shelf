@@ -46,19 +46,50 @@ export interface Genre {
   name: string;
 }
 
-export interface Book {
-  id: number;
+export interface ContentRatingAvg {
+  violence_level: number;
+  language_level: number;
+  sexual_content_level: number;
+  substance_use_level: number;
+  common_tags: string[];
+  count: number;
+}
+
+export interface BookSummary {
+  id?: number;
   title: string;
   author: string;
   isbn?: string;
   description?: string;
   cover_url?: string;
   publication_date?: string;
-  created_at: string;
   genres: Genre[];
   avg_rating?: number;
   rating_count: number;
-  fingerprint?: BookFingerprint;
+  content_rating?: ContentRatingAvg | null;
+}
+
+export interface Review {
+  id: number;
+  user_id: number;
+  username: string;
+  book_id: number;
+  review_text: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RelatedBook {
+  id: number;
+  title: string;
+  author: string;
+  cover_url?: string;
+}
+
+export interface Book extends BookSummary {
+  created_at?: string;
+  reviews?: Review[];
+  related_books?: RelatedBook[];
 }
 
 export interface User {
@@ -68,6 +99,28 @@ export interface User {
   created_at: string;
 }
 
+export interface UserProfile {
+  id: number;
+  username: string;
+  created_at: string;
+  books_read: number;
+  currently_reading: number;
+  want_to_read: number;
+  dnf: number;
+  reviews_count: number;
+}
+
+export interface UserBook {
+  id: number;
+  book_id: number;
+  status: 'want_to_read' | 'currently_reading' | 'finished' | 'dnf';
+  rating: number | null;
+  date_added: string;
+  date_started: string | null;
+  date_finished: string | null;
+  book: BookSummary;
+}
+
 export interface AuthTokens {
   access_token: string;
   token_type: string;
@@ -75,6 +128,19 @@ export interface AuthTokens {
 
 export interface APIError {
   detail: string;
+}
+
+export interface GoodreadsImportResult {
+  imported: number;
+  skipped: number;
+  errors: number;
+  total: number;
+  results: { title: string; status: string; error?: string }[];
+}
+
+export interface ISBNDetailLookupResult {
+  source: string;
+  book: BookSummary;
 }
 
 // Dimension metadata for UI

@@ -1,3 +1,4 @@
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,15 +11,173 @@ from ..models.user_book import UserBook
 from ..models.review import Review
 from ..models.content_rating import ContentRating
 from ..models.related_book import RelatedBook
+from ..models.user import User
 from ..schemas.book import (
-    BookCreate, BookUpdate, BookOut, BookDetail, BookSummary,
-    RelatedBookOut, ReviewOut, ContentRatingAvg, OpenLibraryImport,
+    BookCreate,
+    BookUpdate,
+    BookOut,
+    BookDetail,
+    BookSummary,
+    RelatedBookOut,
+    ReviewOut,
+    ContentRatingAvg,
+    OpenLibraryImport,
 )
-from ..auth import get_current_user
-
-import httpx
+from ..auth import get_current_user, get_current_user_optional
 
 router = APIRouter(prefix="/api/books", tags=["books"])
+
+
+# ---------------------------------------------------------------------------
+# Lookup & Search endpoints (must be defined before /{book_id})
+# ---------------------------------------------------------------------------
+
+
+@router.get("/lookup/{isbn}")
+async def lookup_isbn(
+    isbn: str,
+    save: bool = False,
+    db: AsyncSession = Depends(get_db),
+    user: User | None = Depends(get_current_user_optional),
+):
+    """Look up a book by ISBN. Checks the database first, then OpenLibrary.
+
+    If save=True, the book is persisted to the database before returning.
+    Requires authentication when save=True.
+    """
+    clean_isbn = isbn.replace("-", "").replace(" ", "")
+
+    # Check database first
+    result = await db.execute(
+        select(Book).where(Book.isbn == clean_isbn)
+    )
+    book = result.scalar_one_or_none()
+    if book:
+        avg_r, r_count, cr = await _compute_book_stats(db, book.id)
+        return {
+            "source": "database",
+            "book": _book_to_summary(book, avg_r, r_count, cr),
+        }
+
+    # Query OpenLibrary
+    async with httpx.AsyncClient(timeout=10) as client:
+        resp = await client.get(
+            "https://openlibrary.org/api/books.json",
+            params={
+                "bibkeys": f"ISBN:{clean_isbn}",
+                "format": "data",
+                "jscmd": "data",
+            },
+        )
+        if resp.status_code != 200:
+            raise HTTPException(status_code=502, detail="OpenLibrary service unavailable")
+        try:
+            data = resp.json()
+        except Exception:
+            raise HTTPException(status_code=502, detail="Failed to parse OpenLibrary response")
+
+    key = f"ISBN:{clean_isbn}"
+    if key not in data:
+        raise HTTPException(
+            status_code=404, detail="Book not found for this ISBN"
+        )
+
+    ol = data[key]
+    title = ol.get("title", "")
+    authors = ", ".join(a.get("name", "") for a in ol.get("authors", []))
+    cover = ol.get("cover", {}).get(
+        "large", ol.get("cover", {}).get("medium")
+    )
+    desc = ol.get("notes") if isinstance(ol.get("notes"), str) else None
+    pub_date = None
+
+    if save:
+        if not user:
+            raise HTTPException(
+                status_code=401, detail="Authentication required to save books"
+            )
+        book = Book(
+            title=title,
+            author=authors,
+            isbn=clean_isbn,
+            description=desc,
+            cover_url=cover,
+            publication_date=pub_date,
+        )
+        db.add(book)
+        await db.commit()
+        await db.refresh(book)
+        return {
+            "source": "openlibrary_saved",
+            "book": _book_to_summary(book, None, 0, None),
+        }
+
+    return {
+        "source": "openlibrary",
+        "book": {
+            "title": title,
+            "author": authors,
+            "isbn": clean_isbn,
+            "description": desc,
+            "cover_url": cover,
+            "publication_date": pub_date,
+            "genres": [],
+            "avg_rating": None,
+            "rating_count": 0,
+            "content_rating": None,
+        },
+    }
+
+
+@router.get("/search-external")
+async def search_external(
+    q: str = Query(..., min_length=1),
+    limit: int = Query(10, le=50),
+):
+    """Search OpenLibrary for books without saving to database."""
+    async with httpx.AsyncClient(timeout=10) as client:
+        resp = await client.get(
+            "https://openlibrary.org/search.json",
+            params={"q": q, "limit": limit},
+        )
+        if resp.status_code != 200:
+            raise HTTPException(status_code=502, detail="OpenLibrary service unavailable")
+        try:
+            results = resp.json()
+        except Exception:
+            raise HTTPException(status_code=502, detail="Failed to parse OpenLibrary response")
+
+    books = []
+    for doc in results.get("docs", []):
+        cover_id = doc.get("cover_i")
+        cover = (
+            f"https://covers.openlibrary.org/b/id/{cover_id}-M.jpg"
+            if cover_id
+            else None
+        )
+        isbns = doc.get("isbn", [])
+        pub_year = doc.get("first_publish_year")
+        pub_date = f"{pub_year}-01-01" if pub_year else None
+        books.append(
+            {
+                "title": doc.get("title", ""),
+                "author": ", ".join(doc.get("author_name", [])),
+                "isbn": isbns[0] if isbns else None,
+                "cover_url": cover,
+                "publication_date": pub_date,
+                "description": None,
+                "genres": [],
+                "avg_rating": None,
+                "rating_count": 0,
+                "content_rating": None,
+            }
+        )
+    return books
+
+
+# ---------------------------------------------------------------------------
+# Stats helpers
+# ---------------------------------------------------------------------------
 
 
 async def _compute_book_stats(db: AsyncSession, book_id: int):
@@ -54,6 +213,7 @@ async def _compute_book_stats(db: AsyncSession, book_id: int):
             if tags:
                 all_tags.extend(tags)
         from collections import Counter
+
         tag_counts = Counter(all_tags)
         common = [t for t, c in tag_counts.most_common(10)]
 
@@ -86,6 +246,11 @@ def _book_to_summary(book: Book, avg_rating, rating_count, content_rating) -> di
     }
 
 
+# ---------------------------------------------------------------------------
+# CRUD endpoints
+# ---------------------------------------------------------------------------
+
+
 @router.get("", response_model=list[BookSummary])
 async def list_books(
     q: str | None = Query(None),
@@ -109,7 +274,6 @@ async def list_books(
     if genre:
         stmt = stmt.join(book_genres).join(Genre).where(Genre.name.ilike(f"%{genre}%"))
 
-    # Content rating filters: exclude books whose average exceeds the max
     content_filters = [
         (max_violence, ContentRating.violence_level),
         (max_language, ContentRating.language_level),
@@ -217,7 +381,13 @@ async def create_book(
     await db.commit()
     await db.refresh(book)
     avg_r, r_count, cr = await _compute_book_stats(db, book.id)
-    return {**book.__dict__, "genres": [{"id": g.id, "name": g.name} for g in book.genres], "avg_rating": avg_r, "rating_count": r_count, "content_rating": cr}
+    return {
+        **book.__dict__,
+        "genres": [{"id": g.id, "name": g.name} for g in book.genres],
+        "avg_rating": avg_r,
+        "rating_count": r_count,
+        "content_rating": cr,
+    }
 
 
 @router.put("/{book_id}", response_model=BookOut)
@@ -244,7 +414,13 @@ async def update_book(
     await db.commit()
     await db.refresh(book)
     avg_r, r_count, cr = await _compute_book_stats(db, book.id)
-    return {**book.__dict__, "genres": [{"id": g.id, "name": g.name} for g in book.genres], "avg_rating": avg_r, "rating_count": r_count, "content_rating": cr}
+    return {
+        **book.__dict__,
+        "genres": [{"id": g.id, "name": g.name} for g in book.genres],
+        "avg_rating": avg_r,
+        "rating_count": r_count,
+        "content_rating": cr,
+    }
 
 
 @router.delete("/{book_id}", status_code=204)
@@ -269,10 +445,13 @@ async def add_related_book(
     _user=Depends(get_current_user),
 ):
     if book_id == related_id:
-        raise HTTPException(status_code=400, detail="A book cannot be related to itself")
+        raise HTTPException(
+            status_code=400, detail="A book cannot be related to itself"
+        )
     existing = await db.execute(
         select(RelatedBook).where(
-            RelatedBook.book_id == book_id, RelatedBook.related_book_id == related_id
+            RelatedBook.book_id == book_id,
+            RelatedBook.related_book_id == related_id,
         )
     )
     if existing.scalar_one_or_none():
@@ -292,7 +471,8 @@ async def remove_related_book(
 ):
     result = await db.execute(
         select(RelatedBook).where(
-            RelatedBook.book_id == book_id, RelatedBook.related_book_id == related_id
+            RelatedBook.book_id == book_id,
+            RelatedBook.related_book_id == related_id,
         )
     )
     rel = result.scalar_one_or_none()
@@ -300,7 +480,8 @@ async def remove_related_book(
         await db.delete(rel)
     result2 = await db.execute(
         select(RelatedBook).where(
-            RelatedBook.book_id == related_id, RelatedBook.related_book_id == book_id
+            RelatedBook.book_id == related_id,
+            RelatedBook.related_book_id == book_id,
         )
     )
     rel2 = result2.scalar_one_or_none()
@@ -318,17 +499,25 @@ async def import_from_open_library(
     async with httpx.AsyncClient() as client:
         if data.isbn:
             resp = await client.get(
-                f"https://openlibrary.org/api/books.json",
-                params={"bibkeys": f"ISBN:{data.query}", "format": "data", "jscmd": "data"},
+                "https://openlibrary.org/api/books.json",
+                params={
+                    "bibkeys": f"ISBN:{data.query}",
+                    "format": "data",
+                    "jscmd": "data",
+                },
             )
             result = resp.json()
             key = f"ISBN:{data.query}"
             if key not in result:
-                raise HTTPException(status_code=404, detail="Book not found on Open Library")
+                raise HTTPException(
+                    status_code=404, detail="Book not found on Open Library"
+                )
             ol = result[key]
             title = ol.get("title", "")
             authors = ", ".join(a.get("name", "") for a in ol.get("authors", []))
-            cover = ol.get("cover", {}).get("large", ol.get("cover", {}).get("medium"))
+            cover = ol.get("cover", {}).get(
+                "large", ol.get("cover", {}).get("medium")
+            )
             desc = ol.get("notes") if isinstance(ol.get("notes"), str) else None
             pub_date = None
         else:
@@ -338,12 +527,18 @@ async def import_from_open_library(
             )
             results = resp.json()
             if not results.get("docs"):
-                raise HTTPException(status_code=404, detail="Book not found on Open Library")
+                raise HTTPException(
+                    status_code=404, detail="Book not found on Open Library"
+                )
             doc = results["docs"][0]
             title = doc.get("title", "")
             authors = ", ".join(doc.get("author_name", []))
             cover_id = doc.get("cover_i")
-            cover = f"https://covers.openlibrary.org/b/id/{cover_id}-L.jpg" if cover_id else None
+            cover = (
+                f"https://covers.openlibrary.org/b/id/{cover_id}-L.jpg"
+                if cover_id
+                else None
+            )
             desc = None
             pub_date = None
 
@@ -358,4 +553,10 @@ async def import_from_open_library(
     db.add(book)
     await db.commit()
     await db.refresh(book)
-    return {**book.__dict__, "genres": [], "avg_rating": None, "rating_count": 0, "content_rating": None}
+    return {
+        **book.__dict__,
+        "genres": [],
+        "avg_rating": None,
+        "rating_count": 0,
+        "content_rating": None,
+    }
