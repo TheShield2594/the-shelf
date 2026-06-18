@@ -93,7 +93,7 @@ export function BookFingerprint({ bookId, initialFingerprint }: BookFingerprintP
       <RadarChart data={chartData} className="mb-6" />
 
       {/* Overall Star Equivalent */}
-      {fingerprint.star_equivalent !== null && (
+      {fingerprint.star_equivalent != null && (
         <div className="text-center mb-6 pb-6 border-b border-gray-200">
           <p className="text-sm text-gray-600 mb-1">Overall Rating</p>
           <div className="flex items-center justify-center gap-2">
