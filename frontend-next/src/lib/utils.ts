@@ -1,69 +1,38 @@
-// Utility functions
+import { clsx, type ClassValue } from 'clsx';
 
-import { type ClassValue, clsx } from 'clsx';
-
-/**
- * Merge class names with clsx
- */
 export function cn(...inputs: ClassValue[]) {
   return clsx(inputs);
 }
 
-/**
- * Format a date string to a readable format
- */
-export function formatDate(dateString: string): string {
-  const date = new Date(dateString);
-  return new Intl.DateTimeFormat('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  }).format(date);
+export function formatDate(date: string | null | undefined): string {
+  if (!date) return '—';
+  try {
+    return new Date(date).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  } catch {
+    return '—';
+  }
 }
 
-/**
- * Calculate star equivalent from multi-dimensional rating
- */
-export function calculateStarEquivalent(rating: {
-  pace?: number;
-  emotional_impact?: number;
-  complexity?: number;
-  character_development?: number;
-  plot_quality?: number;
-  prose_style?: number;
-  originality?: number;
-}): number | null {
-  const values = [
-    rating.pace,
-    rating.emotional_impact,
-    rating.complexity,
-    rating.character_development,
-    rating.plot_quality,
-    rating.prose_style,
-    rating.originality,
-  ].filter((v): v is number => v !== undefined && v !== null);
-
-  if (values.length === 0) return null;
-
-  return values.reduce((sum, val) => sum + val, 0) / values.length;
+export function statusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    want_to_read: 'Want to Read',
+    currently_reading: 'Currently Reading',
+    finished: 'Finished',
+    dnf: 'DNF',
+  };
+  return labels[status] || status;
 }
 
-/**
- * Format a number to 1 decimal place
- */
-export function formatRating(rating: number | null | undefined): string {
-  if (rating === null || rating === undefined) return 'N/A';
-  return rating.toFixed(1);
-}
-
-/**
- * Get color for rating value (1-5)
- */
-export function getRatingColor(value: number): string {
-  if (value >= 4.5) return 'text-green-600';
-  if (value >= 4.0) return 'text-green-500';
-  if (value >= 3.5) return 'text-yellow-600';
-  if (value >= 3.0) return 'text-yellow-500';
-  if (value >= 2.5) return 'text-orange-500';
-  return 'text-red-500';
+export function statusColor(status: string): string {
+  const colors: Record<string, string> = {
+    want_to_read: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+    currently_reading: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
+    finished: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',
+    dnf: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
+  };
+  return colors[status] || 'bg-stone-100 text-stone-700 dark:bg-stone-800 dark:text-stone-300';
 }
