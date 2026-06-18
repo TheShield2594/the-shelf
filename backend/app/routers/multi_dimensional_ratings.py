@@ -17,27 +17,21 @@ from ..schemas.multi_dimensional_rating import (
     RadarChartData,
 )
 
-router = APIRouter(prefix="/ratings", tags=["multi-dimensional-ratings"])
+router = APIRouter(prefix="/api/ratings", tags=["multi-dimensional-ratings"])
 
 
-@router.post("/", response_model=MultiDimensionalRatingResponse, status_code=201)
+@router.post("", response_model=MultiDimensionalRatingResponse, status_code=201)
 async def create_or_update_rating(
     rating_data: MultiDimensionalRatingCreate,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Create or update a multi-dimensional rating for a book.
-
-    All dimensions are optional. Users can rate only what matters to them.
-    Automatically updates the book's aggregate fingerprint.
-    """
-    # Verify book exists
+    """Create or update a multi-dimensional rating for a book."""
     book_result = await db.execute(select(Book).where(Book.id == rating_data.book_id))
     book = book_result.scalar_one_or_none()
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
 
-    # Check if rating already exists
     existing_result = await db.execute(
         select(MultiDimensionalRating).where(
             MultiDimensionalRating.user_id == current_user.id,
@@ -47,14 +41,12 @@ async def create_or_update_rating(
     existing_rating = existing_result.scalar_one_or_none()
 
     if existing_rating:
-        # Update existing rating
         update_data = rating_data.model_dump(exclude_unset=True, exclude={"book_id"})
         for key, value in update_data.items():
             setattr(existing_rating, key, value)
         existing_rating.updated_at = func.now()
         rating = existing_rating
     else:
-        # Create new rating
         rating = MultiDimensionalRating(
             user_id=current_user.id, **rating_data.model_dump()
         )
@@ -63,7 +55,6 @@ async def create_or_update_rating(
     await db.commit()
     await db.refresh(rating)
 
-    # Update book fingerprint (aggregate ratings)
     await update_book_fingerprint(db, rating_data.book_id)
 
     return rating
@@ -75,10 +66,7 @@ async def get_user_rating(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Get the current user's rating for a specific book.
-
-    Returns 404 if the user hasn't rated this book yet.
-    """
+    """Get the current user's rating for a specific book."""
     result = await db.execute(
         select(MultiDimensionalRating).where(
             MultiDimensionalRating.user_id == current_user.id,
@@ -99,10 +87,7 @@ async def delete_rating(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Delete the current user's rating for a book.
-
-    Automatically updates the book's aggregate fingerprint.
-    """
+    """Delete the current user's rating for a book."""
     result = await db.execute(
         select(MultiDimensionalRating).where(
             MultiDimensionalRating.user_id == current_user.id,
@@ -117,7 +102,6 @@ async def delete_rating(
     await db.delete(rating)
     await db.commit()
 
-    # Update book fingerprint
     await update_book_fingerprint(db, book_id)
 
     return None
@@ -128,25 +112,18 @@ async def get_book_fingerprint(
     book_id: int,
     db: AsyncSession = Depends(get_db),
 ):
-    """Get the aggregated rating fingerprint for a book.
-
-    This shows the average ratings across all users.
-    Returns a fingerprint with zero ratings if the book hasn't been rated yet.
-    """
-    # Verify book exists
+    """Get the aggregated rating fingerprint for a book."""
     book_result = await db.execute(select(Book).where(Book.id == book_id))
     book = book_result.scalar_one_or_none()
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
 
-    # Get fingerprint
     result = await db.execute(
         select(BookFingerprint).where(BookFingerprint.book_id == book_id)
     )
     fingerprint = result.scalar_one_or_none()
 
     if not fingerprint:
-        # Create empty fingerprint
         fingerprint = BookFingerprint(book_id=book_id, total_ratings=0)
 
     return fingerprint
@@ -158,12 +135,7 @@ async def get_radar_chart_data(
     db: AsyncSession = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user),
 ):
-    """Get radar chart data for a book.
-
-    If the user is authenticated and has rated the book, returns their rating.
-    Otherwise, returns the aggregate fingerprint.
-    """
-    # Try to get user's rating first
+    """Get radar chart data for a book."""
     if current_user:
         result = await db.execute(
             select(MultiDimensionalRating).where(
@@ -175,17 +147,12 @@ async def get_radar_chart_data(
         if user_rating:
             return RadarChartData.from_rating(user_rating)
 
-    # Fall back to book fingerprint
     fingerprint = await get_book_fingerprint(book_id, db)
     return RadarChartData.from_rating(fingerprint)
 
 
 async def update_book_fingerprint(db: AsyncSession, book_id: int):
-    """Recalculate and update the aggregate rating fingerprint for a book.
-
-    This function is called automatically when ratings are created, updated, or deleted.
-    """
-    # Calculate aggregate statistics
+    """Recalculate and update the aggregate rating fingerprint for a book."""
     stats_result = await db.execute(
         select(
             func.avg(MultiDimensionalRating.pace).label("avg_pace"),
@@ -202,7 +169,6 @@ async def update_book_fingerprint(db: AsyncSession, book_id: int):
     )
     stats = stats_result.one()
 
-    # Calculate star equivalent (average of all non-null dimensions)
     dimensions = [
         stats.avg_pace,
         stats.avg_emotional_impact,
@@ -215,14 +181,12 @@ async def update_book_fingerprint(db: AsyncSession, book_id: int):
     non_null = [d for d in dimensions if d is not None]
     star_equivalent = sum(non_null) / len(non_null) if non_null else None
 
-    # Check if fingerprint exists
     fingerprint_result = await db.execute(
         select(BookFingerprint).where(BookFingerprint.book_id == book_id)
     )
     fingerprint = fingerprint_result.scalar_one_or_none()
 
     if fingerprint:
-        # Update existing fingerprint
         fingerprint.avg_pace = stats.avg_pace
         fingerprint.avg_emotional_impact = stats.avg_emotional_impact
         fingerprint.avg_complexity = stats.avg_complexity
@@ -233,7 +197,6 @@ async def update_book_fingerprint(db: AsyncSession, book_id: int):
         fingerprint.star_equivalent = star_equivalent
         fingerprint.total_ratings = stats.total_ratings
     else:
-        # Create new fingerprint
         fingerprint = BookFingerprint(
             book_id=book_id,
             avg_pace=stats.avg_pace,
