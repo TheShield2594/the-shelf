@@ -40,7 +40,7 @@ Create a modern, privacy-respecting, algorithmically intelligent book platform t
 ✅ Detailed data model for multi-dimensional ratings
 ✅ Recommendation engine architecture
 ✅ Security & privacy design
-✅ Deployment architecture (Vercel + Railway + Neon)
+✅ Deployment architecture (frontend host + Railway + Neon)
 ✅ Migration plan from POC to full vision
 
 **Tech Stack:**
@@ -48,7 +48,7 @@ Create a modern, privacy-respecting, algorithmically intelligent book platform t
 - Backend: FastAPI + SQLAlchemy (async) - keep
 - Database: PostgreSQL 15+ with pgvector - enhanced
 - ML: Sentence Transformers + scikit-learn - new
-- Hosting: Vercel (frontend) + Railway (backend) + Neon (database)
+- Hosting: Frontend host + Railway (backend) + Neon (database)
 
 #### 3. IMPLEMENTATION_ROADMAP.md (5,500 words)
 ✅ 6-9 week implementation plan
@@ -342,7 +342,7 @@ SELECT * FROM multi_dimensional_ratings LIMIT 1;
 **Infrastructure:**
 - [ ] Set up Neon PostgreSQL (managed)
 - [ ] Deploy backend to Railway/Fly.io
-- [ ] Deploy frontend to Vercel
+- [ ] Deploy frontend to hosting provider
 - [ ] Configure environment variables
 - [ ] Run migrations in production
 - [ ] Set up monitoring (Sentry)

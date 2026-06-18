@@ -346,7 +346,7 @@ alembic downgrade -1
 psql the_shelf < backup_20250213.sql
 ```
 
-## Vercel/Railway Deployment
+## Railway Deployment
 
 For serverless deployments, run migrations as part of the build process:
 

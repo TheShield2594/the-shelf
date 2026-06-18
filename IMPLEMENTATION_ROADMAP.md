@@ -17,7 +17,6 @@ This document provides a step-by-step guide for implementing The Shelf from the 
 ✅ Open Library import
 ✅ PostgreSQL database
 ✅ Docker Compose setup
-✅ Vercel deployment configuration
 
 ### What Needs to Change
 
@@ -904,8 +903,8 @@ Ensure quality and deploy to production.
 - E2E tests (Playwright)
 - Performance testing (Lighthouse)
 - Security audit (OWASP Top 10)
-- Deploy to Vercel (frontend) + Railway (backend)
-- Set up monitoring (Sentry, Vercel Analytics)
+- Deploy to your hosting provider (frontend) + Railway (backend)
+- Set up monitoring (Sentry, frontend analytics)
 
 ---
 

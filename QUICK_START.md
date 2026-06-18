@@ -282,7 +282,7 @@ CREATE EXTENSION vector;
 ### Deploy to Production
 
 - **[DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)** - Step-by-step deployment
-- Uses free tier hosting (Vercel + Railway + Neon)
+- Uses free tier hosting (frontend host + Railway + Neon)
 - Costs $0-5/month for MVP
 
 ---
