@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { useAuth } from '@/components/AuthProvider';
@@ -16,11 +16,12 @@ export default function ImportPage() {
   const [error, setError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  if (authLoading) return <LoadingSpinner />;
-  if (!user && !authLoading) {
-    router.push('/login');
-    return null;
-  }
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) router.push('/login');
+  }, [user, authLoading, router]);
+
+  if (authLoading || !user) return <LoadingSpinner />;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -50,6 +51,13 @@ export default function ImportPage() {
     if (f && f.name.endsWith('.csv')) {
       setFile(f);
       setError('');
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      fileInputRef.current?.click();
     }
   };
 
@@ -117,7 +125,10 @@ export default function ImportPage() {
             onDrop={handleDrop}
             onDragOver={(e) => e.preventDefault()}
             onClick={() => fileInputRef.current?.click()}
-            className="card p-8 border-2 border-dashed border-stone-300 dark:border-gray-700 hover:border-shelf-500 dark:hover:border-shelf-600 cursor-pointer text-center transition-colors mb-4"
+            onKeyDown={handleKeyDown}
+            role="button"
+            tabIndex={0}
+            className="card p-8 border-2 border-dashed border-stone-300 dark:border-gray-700 hover:border-shelf-500 dark:hover:border-shelf-600 cursor-pointer text-center transition-colors mb-4 focus:outline-none focus:ring-2 focus:ring-shelf-500"
           >
             <input
               ref={fileInputRef}

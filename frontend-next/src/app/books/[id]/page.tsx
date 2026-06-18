@@ -21,8 +21,13 @@ export default function BookDetailPage() {
   const [myRating, setMyRating] = useState<number | null>(null);
   const [reviewText, setReviewText] = useState('');
   const [showReviewForm, setShowReviewForm] = useState(false);
+  const [reviewError, setReviewError] = useState('');
 
   useEffect(() => {
+    if (isNaN(bookId)) {
+      setLoading(false);
+      return;
+    }
     api.getBook(bookId)
       .then((b) => {
         setBook(b);
@@ -83,24 +88,20 @@ export default function BookDetailPage() {
 
   const handleSubmitReview = async () => {
     if (!reviewText.trim()) return;
+    setReviewError('');
     try {
-      const response = await fetch('/api/reviews', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ book_id: bookId, review_text: reviewText }),
-      });
-      if (response.ok) {
-        setReviewText('');
-        setShowReviewForm(false);
-        const updated = await api.getBook(bookId);
-        setBook(updated);
-      }
+      await api.createReview(bookId, reviewText);
+      setReviewText('');
+      setShowReviewForm(false);
+      const updated = await api.getBook(bookId);
+      setBook(updated);
     } catch (err: any) {
-      alert(err.message);
+      setReviewError(err.message || 'Failed to post review');
     }
   };
 
   if (loading) return <LoadingSpinner label="Loading book..." />;
+  if (isNaN(bookId)) return <div className="max-w-4xl mx-auto px-4 py-16 text-center text-stone-500 dark:text-gray-400">Invalid book ID.</div>;
   if (!book) return <div className="max-w-4xl mx-auto px-4 py-16 text-center text-stone-500 dark:text-gray-400">Book not found.</div>;
 
   return (
@@ -189,6 +190,11 @@ export default function BookDetailPage() {
 
         {showReviewForm && (
           <div className="card p-4 mb-6">
+            {reviewError && (
+              <div className="mb-3 p-3 rounded-lg bg-red-50 dark:bg-red-950/50 text-red-600 dark:text-red-400 text-sm">
+                {reviewError}
+              </div>
+            )}
             <textarea
               value={reviewText}
               onChange={(e) => setReviewText(e.target.value)}

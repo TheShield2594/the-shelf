@@ -58,6 +58,11 @@ export default function LibraryPage() {
   const handleRate = async (bookId: number, rating: number) => {
     try {
       await api.updateLibraryEntry(bookId, { rating });
+      setBooks((prev) =>
+        prev.map((ub) =>
+          ub.book_id === bookId ? { ...ub, rating } : ub
+        )
+      );
     } catch (err: any) {
       alert(err.message);
     }

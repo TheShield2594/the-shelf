@@ -8,7 +8,7 @@ import { BookCover } from '@/components/BookCover';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import type { BookSummary } from '@/types';
 
-type ScanState = 'idle' | 'scanning' | 'found' | 'not_found' | 'error';
+type ScanState = 'idle' | 'camera_scanning' | 'lookup_scanning' | 'found' | 'not_found' | 'error';
 
 export default function ScanPage() {
   const router = useRouter();
@@ -26,8 +26,10 @@ export default function ScanPage() {
     if (!user) router.push('/login');
   }, [user, authLoading, router]);
 
+  if (authLoading || !user) return <LoadingSpinner />;
+
   const startScanner = async () => {
-    setScanState('scanning');
+    setScanState('camera_scanning');
     try {
       const { Html5Qrcode } = await import('html5-qrcode');
       const scanner = new Html5Qrcode('barcode-reader', { verbose: false });
@@ -60,7 +62,7 @@ export default function ScanPage() {
   }, []);
 
   const lookupIsbn = async (isbnToLookup: string) => {
-    setScanState('scanning');
+    setScanState('lookup_scanning');
     stopScanner();
     try {
       const result = await api.lookupISBN(isbnToLookup, true);
@@ -97,8 +99,6 @@ export default function ScanPage() {
     setManualIsbn('');
   };
 
-  if (authLoading) return <LoadingSpinner />;
-
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
       <h1 className="text-2xl font-serif font-bold text-stone-900 dark:text-gray-100 mb-6">Scan Barcode</h1>
@@ -127,10 +127,16 @@ export default function ScanPage() {
         </div>
       )}
 
-      {scanState === 'scanning' && (
+      {(scanState === 'camera_scanning' || scanState === 'lookup_scanning') && (
         <div className="card p-4">
-          <div id="barcode-reader" className="w-full rounded-lg overflow-hidden mb-4" />
-          <button onClick={() => { stopScanner(); handleReset(); }} className="btn-ghost w-full">Cancel</button>
+          {scanState === 'camera_scanning' ? (
+            <>
+              <div id="barcode-reader" className="w-full rounded-lg overflow-hidden mb-4" />
+              <button onClick={() => { stopScanner(); handleReset(); }} className="btn-ghost w-full">Cancel</button>
+            </>
+          ) : (
+            <LoadingSpinner label="Looking up book..." />
+          )}
         </div>
       )}
 

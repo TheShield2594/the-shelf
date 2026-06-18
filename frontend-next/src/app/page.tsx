@@ -14,7 +14,7 @@ export default function HomePage() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
 
   useEffect(() => {
-    api.getBooks('limit=8').then(setRecentBooks).catch(() => {});
+    api.getBooks({ limit: '8' }).then(setRecentBooks).catch(() => {});
     if (user) {
       api.getProfile().then(setProfile).catch(() => {});
     }
@@ -88,7 +88,7 @@ export default function HomePage() {
 
       <div className="grid md:grid-cols-3 gap-6">
         {[
-          { title: 'Barcode Scanning', desc: 'Scan a book's barcode to instantly look it up, see reviews, and add it to your shelf.', icon: 'M3 5h2v2H3V5zm4 0h14v2H7V5zM3 11h2v2H3v-2zm4 0h14v2H7v-2zM3 17h2v2H3v-2zm4 0h14v2H7v-2z' },
+          { title: 'Barcode Scanning', desc: "Scan a book's barcode to instantly look it up, see reviews, and add it to your shelf.", icon: 'M3 5h2v2H3V5zm4 0h14v2H7V5zM3 11h2v2H3v-2zm4 0h14v2H7v-2zM3 17h2v2H3v-2zm4 0h14v2H7v-2z' },
           { title: 'Multi-Dimensional Ratings', desc: 'Rate books across 7 dimensions — not just stars. Find your next read by mood, pace, or style.', icon: 'M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5' },
           { title: 'Goodreads Import', desc: 'Migrate your Goodreads library in seconds with a simple CSV import. No API keys needed.', icon: 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3' },
         ].map((feature) => (

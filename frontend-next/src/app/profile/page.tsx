@@ -12,6 +12,7 @@ export default function ProfilePage() {
   const { user, loading: authLoading, logout } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     if (authLoading) return;
@@ -21,11 +22,23 @@ export default function ProfilePage() {
     }
     api.getProfile()
       .then(setProfile)
-      .catch(() => {})
+      .catch((err: any) => setError(err.message || 'Failed to load profile'))
       .finally(() => setLoading(false));
   }, [user, authLoading]);
 
   if (authLoading || loading) return <LoadingSpinner />;
+
+  if (error) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-8">
+        <div className="card p-8 text-center">
+          <p className="text-red-500 dark:text-red-400 mb-4">{error}</p>
+          <button onClick={() => window.location.reload()} className="btn-primary">Retry</button>
+        </div>
+      </div>
+    );
+  }
+
   if (!user || !profile) return null;
 
   const stats = [

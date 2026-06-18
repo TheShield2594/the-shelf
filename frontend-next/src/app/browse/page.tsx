@@ -28,9 +28,11 @@ export default function BrowsePage() {
   }, [query]);
 
   useEffect(() => {
+    // Skip debounced shelf search when in external mode
+    if (searchMode !== 'shelf') return;
     const timer = setTimeout(loadBooks, 300);
     return () => clearTimeout(timer);
-  }, [loadBooks]);
+  }, [loadBooks, searchMode]);
 
   const handleExternalSearch = async () => {
     if (!query) return;
@@ -45,8 +47,8 @@ export default function BrowsePage() {
     }
   };
 
-  const handleImport = async (book: BookSummary) => {
-    setImporting(books.length);
+  const handleImport = async (book: BookSummary, idx: number) => {
+    setImporting(idx);
     try {
       const created = await api.createBook({
         title: book.title,
@@ -129,7 +131,7 @@ export default function BrowsePage() {
               <BookCard book={book} />
               {searchMode === 'external' && !book.id && (
                 <button
-                  onClick={() => handleImport(book)}
+                  onClick={() => handleImport(book, idx)}
                   disabled={importing === idx}
                   className="absolute top-2 right-2 bg-shelf-700 hover:bg-shelf-800 text-white rounded-lg px-2 py-1 text-xs shadow-md transition-colors disabled:opacity-50"
                 >
