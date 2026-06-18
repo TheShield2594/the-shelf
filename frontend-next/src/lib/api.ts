@@ -12,6 +12,7 @@ import type {
   AuthTokens,
   APIError,
   GoodreadsImportResult,
+  ISBNDetailLookupResult,
 } from '@/types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
@@ -47,7 +48,9 @@ class APIClient {
       const error: APIError = await response.json().catch(() => ({
         detail: `HTTP ${response.status}: ${response.statusText}`,
       }));
-      throw new Error(error.detail);
+      const err = new Error(error.detail) as Error & { status: number };
+      err.status = response.status;
+      throw err;
     }
 
     if (response.status === 204) {
@@ -73,7 +76,7 @@ class APIClient {
   }
 
   async login(username: string, password: string): Promise<AuthTokens> {
- const response = await fetch(`${this.baseURL}/api/auth/login`, {
+    const response = await fetch(`${this.baseURL}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password }),
@@ -119,9 +122,9 @@ class APIClient {
     });
   }
 
-  async lookupISBN(isbn: string, save = false): Promise<{ source: string; book: BookSummary }> {
-    return this.request<{ source: string; book: BookSummary }>(
-      `/api/books/lookup/${isbn}${save ? '?save=true' : ''}`
+  async lookupISBN(isbn: string, save = false): Promise<ISBNDetailLookupResult> {
+    return this.request<ISBNDetailLookupResult>(
+      `/api/books/lookup/${encodeURIComponent(isbn)}${save ? '?save=true' : ''}`
     );
   }
 
@@ -153,9 +156,17 @@ class APIClient {
     return this.request<void>(`/api/library/${bookId}`, { method: 'DELETE' });
   }
 
+  // Reviews
+  async createReview(bookId: number, reviewText: string): Promise<any> {
+    return this.request<any>('/api/reviews', {
+      method: 'POST',
+      body: JSON.stringify({ book_id: bookId, review_text: reviewText }),
+    });
+  }
+
   // Goodreads import
   async importGoodreads(file: File): Promise<GoodreadsImportResult> {
- const formData = new FormData();
+    const formData = new FormData();
     formData.append('file', file);
 
     const headers: HeadersInit = {};

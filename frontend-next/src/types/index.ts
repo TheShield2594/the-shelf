@@ -138,7 +138,7 @@ export interface GoodreadsImportResult {
   results: { title: string; status: string; error?: string }[];
 }
 
-export interface ISBNDetailookupResult {
+export interface ISBNDetailLookupResult {
   source: string;
   book: BookSummary;
 }
