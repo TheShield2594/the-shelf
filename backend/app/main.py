@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
 from .database import engine, Base
-from .routers import auth, books, genres, library, reviews, content_ratings, multi_dimensional_ratings
+from .routers import auth, books, genres, library, reviews, content_ratings, multi_dimensional_ratings, goodreads
 
 
 @asynccontextmanager
@@ -15,7 +15,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="The Shelf", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="The Shelf", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -32,6 +32,7 @@ app.include_router(library.router)
 app.include_router(reviews.router)
 app.include_router(content_ratings.router)
 app.include_router(multi_dimensional_ratings.router)
+app.include_router(goodreads.router)
 
 
 @app.get("/api/health")

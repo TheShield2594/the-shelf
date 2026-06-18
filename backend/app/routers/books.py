@@ -1,3 +1,4 @@
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,8 +16,6 @@ from ..schemas.book import (
     RelatedBookOut, ReviewOut, ContentRatingAvg, OpenLibraryImport,
 )
 from ..auth import get_current_user
-
-import httpx
 
 router = APIRouter(prefix="/api/books", tags=["books"])
 
@@ -86,6 +85,115 @@ def _book_to_summary(book: Book, avg_rating, rating_count, content_rating) -> di
     }
 
 
+@router.get("/lookup/{isbn}")
+async def lookup_isbn(
+    isbn: str,
+    save: bool = Query(False),
+    db: AsyncSession = Depends(get_db),
+):
+    """Look up a book by ISBN. First checks the database, then queries OpenLibrary.
+    If save=true, saves the book to the database before returning.
+    """
+    clean_isbn = isbn.replace("-", "").replace(" ", "")
+
+    result = await db.execute(select(Book).where(Book.isbn == clean_isbn))
+    book = result.scalar_one_or_none()
+    if book:
+        await db.refresh(book, attribute_names=["genres"])
+        avg_r, r_count, cr = await _compute_book_stats(db, book.id)
+        return {"source": "database", "book": _book_to_summary(book, avg_r, r_count, cr)}
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        resp = await client.get(
+            "https://openlibrary.org/api/books.json",
+            params={"bibkeys": f"ISBN:{clean_isbn}", "format": "data", "jscmd": "data"},
+        )
+        data = resp.json()
+        key = f"ISBN:{clean_isbn}"
+        if key not in data:
+            raise HTTPException(status_code=404, detail="Book not found for this ISBN")
+
+        ol = data[key]
+        title = ol.get("title", "")
+        authors = ", ".join(a.get("name", "") for a in ol.get("authors", []))
+        cover = ol.get("cover", {}).get("large", ol.get("cover", {}).get("medium"))
+        desc = ol.get("notes") if isinstance(ol.get("notes"), str) else None
+        if not desc and ol.get("description"):
+            desc = ol.get("description") if isinstance(ol.get("description"), str) else ol.get("description", {}).get("value")
+        pub_date = None
+        if ol.get("publish_date"):
+            try:
+                from datetime import datetime
+                for fmt in ("%B %Y", "%b %Y", "%Y", "%B %d, %Y", "%b %d, %Y"):
+                    try:
+                        pub_date = datetime.strptime(ol["publish_date"].strip(), fmt).date()
+                        break
+                    except ValueError:
+                        continue
+            except Exception:
+                pass
+
+        book_data = {
+            "title": title,
+            "author": authors,
+            "isbn": clean_isbn,
+            "description": desc,
+            "cover_url": cover,
+            "publication_date": pub_date,
+            "genres": [],
+            "avg_rating": None,
+            "rating_count": 0,
+            "content_rating": None,
+        }
+
+    if save:
+        book = Book(
+            title=title,
+            author=authors,
+            isbn=clean_isbn,
+            description=desc,
+            cover_url=cover,
+            publication_date=pub_date,
+        )
+        db.add(book)
+        await db.commit()
+        await db.refresh(book)
+        return {"source": "saved", "book": _book_to_summary(book, None, 0, None)}
+
+    return {"source": "openlibrary", "book": book_data}
+
+
+@router.get("/search-external")
+async def search_external(q: str = Query(..., min_length=1), limit: int = Query(10, le=50)):
+    """Search OpenLibrary for books without saving to database."""
+    async with httpx.AsyncClient(timeout=15) as client:
+        resp = await client.get(
+            "https://openlibrary.org/search.json",
+            params={"q": q, "limit": limit},
+        )
+        results = resp.json()
+
+    books = []
+    for doc in results.get("docs", []):
+        cover_id = doc.get("cover_i")
+        cover = f"https://covers.openlibrary.org/b/id/{cover_id}-M.jpg" if cover_id else None
+        isbns = doc.get("isbn", [])
+        first_isbn = isbns[0] if isbns else None
+        books.append({
+            "title": doc.get("title", ""),
+            "author": ", ".join(doc.get("author_name", [])),
+            "isbn": first_isbn,
+            "cover_url": cover,
+            "publication_date": str(doc.get("first_publish_year", "")) or None,
+            "description": None,
+            "genres": [],
+            "avg_rating": None,
+            "rating_count": 0,
+            "content_rating": None,
+        })
+    return books
+
+
 @router.get("", response_model=list[BookSummary])
 async def list_books(
     q: str | None = Query(None),
@@ -109,7 +217,6 @@ async def list_books(
     if genre:
         stmt = stmt.join(book_genres).join(Genre).where(Genre.name.ilike(f"%{genre}%"))
 
-    # Content rating filters: exclude books whose average exceeds the max
     content_filters = [
         (max_violence, ContentRating.violence_level),
         (max_language, ContentRating.language_level),
@@ -315,10 +422,10 @@ async def import_from_open_library(
     db: AsyncSession = Depends(get_db),
     _user=Depends(get_current_user),
 ):
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=15) as client:
         if data.isbn:
             resp = await client.get(
-                f"https://openlibrary.org/api/books.json",
+                "https://openlibrary.org/api/books.json",
                 params={"bibkeys": f"ISBN:{data.query}", "format": "data", "jscmd": "data"},
             )
             result = resp.json()
