@@ -17,6 +17,7 @@ services:
     restart: unless-stopped
 
   backend:
+    image: ghcr.io/${GHCR_OWNER:-theshield2594}/the-shelf-backend:${TAG:-latest}
     build: ./backend
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-shelf}:${POSTGRES_PASSWORD:-shelf_secret}@db:5432/${POSTGRES_DB:-the_shelf}
@@ -28,6 +29,7 @@ services:
     restart: unless-stopped
 
   frontend:
+    image: ghcr.io/${GHCR_OWNER:-theshield2594}/the-shelf-frontend:${TAG:-latest}
     build:
       context: ./frontend-next
       args:
