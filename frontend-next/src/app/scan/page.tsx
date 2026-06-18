@@ -12,7 +12,7 @@ type ScanState = 'idle' | 'scanning' | 'found' | 'not_found' | 'error';
 
 export default function ScanPage() {
   const router = useRouter();
-  { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [scanState, setScanState] = useState<ScanState>('idle');
   const [isbn, setIsbn] = useState('');
   const [manualIsbn, setManualIsbn] = useState('');
@@ -20,7 +20,6 @@ export default function ScanPage() {
   const [bookSource, setBookSource] = useState('');
   const [adding, setAdding] = useState(false);
   const scannerRef = useRef<any>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (authLoading) return;
@@ -44,7 +43,7 @@ export default function ScanPage() {
         },
         () => {}
       );
-    } catch (err: any) {
+    } catch {
       setScanState('error');
     }
   };
@@ -68,7 +67,7 @@ export default function ScanPage() {
       setBook(result.book);
       setBookSource(result.source);
       setScanState('found');
-    } catch (err: any) {
+    } catch {
       setScanState('not_found');
     }
   };
@@ -130,7 +129,7 @@ export default function ScanPage() {
 
       {scanState === 'scanning' && (
         <div className="card p-4">
-          <div id="barcode-reader" className="w-full rounded-lg overflow-hidden mb-4" ref={containerRef} />
+          <div id="barcode-reader" className="w-full rounded-lg overflow-hidden mb-4" />
           <button onClick={() => { stopScanner(); handleReset(); }} className="btn-ghost w-full">Cancel</button>
         </div>
       )}
