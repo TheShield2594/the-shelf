@@ -99,7 +99,8 @@ class ApiClient {
 
   // Books
   async listBooks(params?: { q?: string; genre?: string; limit?: number; offset?: number }): Promise<BookSummary[]> {
-    const query = new URLSearchParams();n    if (params?.q) query.set('q', params.q);
+    const query = new URLSearchParams();
+    if (params?.q) query.set('q', params.q);
     if (params?.genre) query.set('genre', params.genre);
     if (params?.limit) query.set('limit', String(params.limit));
     if (params?.offset) query.set('offset', String(params.offset));
