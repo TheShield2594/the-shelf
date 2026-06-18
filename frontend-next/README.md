@@ -184,19 +184,6 @@ Multi-dimensional ratings enable:
 
 ## Deployment
 
-### Vercel (Recommended)
-
-```bash
-# Install Vercel CLI
-npm i -g vercel
-
-# Deploy
-vercel
-```
-
-Set environment variable in Vercel dashboard:
-- `NEXT_PUBLIC_API_URL` → Your production backend URL
-
 ### Docker
 
 ```bash
