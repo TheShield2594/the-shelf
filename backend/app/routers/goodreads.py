@@ -16,6 +16,7 @@ from ..auth import get_current_user
 
 router = APIRouter(prefix="/api/goodreads", tags=["goodreads"])
 
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 
 STATUS_MAP = {
     "read": "finished",
@@ -30,8 +31,10 @@ def clean_isbn(raw: str) -> str | None:
     cleaned = raw.strip()
     if cleaned.startswith('="') and cleaned.endswith('"'):
         cleaned = cleaned[2:-1]
-    cleaned = cleaned.replace("-", "").strip()
-    if cleaned.isdigit() and len(cleaned) in (10, 13):
+    cleaned = cleaned.replace("-", "").replace(" ", "").strip()
+    if len(cleaned) == 13 and cleaned.isdigit():
+        return cleaned
+    if len(cleaned) == 10 and cleaned[:-1].isdigit() and cleaned[-1] in "0123456789X":
         return cleaned
     return None
 
@@ -46,7 +49,19 @@ async def import_goodreads_csv(
     if not file.filename or not file.filename.endswith(".csv"):
         raise HTTPException(status_code=400, detail="Please upload a CSV file")
 
+    if file.size and file.size > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large. Maximum size is {MAX_FILE_SIZE // (1024 * 1024)}MB",
+        )
+
     content = await file.read()
+    if len(content) > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large. Maximum size is {MAX_FILE_SIZE // (1024 * 1024)}MB",
+        )
+
     try:
         text = content.decode("utf-8-sig")
     except UnicodeDecodeError:
@@ -61,83 +76,80 @@ async def import_goodreads_csv(
 
     for row in reader:
         title = row.get("Title", "").strip()
+        if not title:
+            skipped += 1
+            results.append({"title": "(empty)", "status": "skipped"})
+            continue
+
+        row_status = None
         try:
-            if not title:
-                skipped += 1
-                results.append({"title": "(empty)", "status": "skipped"})
-                continue
-
-            author = row.get("Author", "").strip()
-            isbn = clean_isbn(row.get("ISBN", "")) or clean_isbn(
-                row.get("ISBN13", "")
-            )
-            rating_str = row.get("My Rating", "0").strip()
-            rating = (
-                int(rating_str) if rating_str and rating_str != "0" else None
-            )
-            shelf = row.get("Exclusive Shelf", "to-read").strip()
-            status = STATUS_MAP.get(shelf, "want_to_read")
-
-            # Check if book exists by ISBN
-            book = None
-            if isbn:
-                result = await db.execute(
-                    select(Book).where(Book.isbn == isbn)
+            async with db.begin_nested():
+                author = row.get("Author", "").strip()
+                isbn = clean_isbn(row.get("ISBN", "")) or clean_isbn(
+                    row.get("ISBN13", "")
                 )
-                book = result.scalar_one_or_none()
+                rating_str = row.get("My Rating", "0").strip()
+                rating = (
+                    int(rating_str) if rating_str and rating_str != "0" else None
+                )
+                if rating is not None and not (1 <= rating <= 5):
+                    rating = None
 
-            if not book:
-                # Try title + author match
-                if author:
+                shelf = row.get("Exclusive Shelf", "to-read").strip()
+                status = STATUS_MAP.get(shelf, "want_to_read")
+
+                # Check if book exists by ISBN only
+                book = None
+                if isbn:
                     result = await db.execute(
-                        select(Book).where(
-                            Book.title.ilike(f"%{title}%"),
-                            Book.author.ilike(f"%{author}%"),
-                        )
+                        select(Book).where(Book.isbn == isbn)
                     )
                     book = result.scalar_one_or_none()
 
-            if not book:
-                cover_url = (
-                    f"https://covers.openlibrary.org/b/isbn/{isbn}-M.jpg"
-                    if isbn
-                    else None
-                )
-                book = Book(
-                    title=title,
-                    author=author or "Unknown",
-                    isbn=isbn,
-                    cover_url=cover_url,
-                )
-                db.add(book)
-                await db.flush()
+                if not book:
+                    cover_url = (
+                        f"https://covers.openlibrary.org/b/isbn/{isbn}-M.jpg"
+                        if isbn
+                        else None
+                    )
+                    book = Book(
+                        title=title,
+                        author=author or "Unknown",
+                        isbn=isbn,
+                        cover_url=cover_url,
+                    )
+                    db.add(book)
+                    await db.flush()
 
-            # Check if already in user's library
-            existing = await db.execute(
-                select(UserBook).where(
-                    UserBook.user_id == user.id,
-                    UserBook.book_id == book.id,
+                # Check if already in user's library
+                existing = await db.execute(
+                    select(UserBook).where(
+                        UserBook.user_id == user.id,
+                        UserBook.book_id == book.id,
+                    )
                 )
-            )
-            if existing.scalar_one_or_none():
+                if existing.scalar_one_or_none():
+                    row_status = "already_in_library"
+                else:
+                    now = datetime.now(timezone.utc)
+                    ub = UserBook(
+                        user_id=user.id,
+                        book_id=book.id,
+                        status=status,
+                        rating=rating,
+                        date_started=now if status == "currently_reading" else None,
+                        date_finished=now if status == "finished" else None,
+                    )
+                    db.add(ub)
+                    await db.flush()
+                    row_status = "imported"
+
+            # Savepoint released successfully — update counters
+            if row_status == "imported":
+                imported += 1
+            else:
                 skipped += 1
-                results.append(
-                    {"title": title, "status": "already_in_library"}
-                )
-                continue
-
-            now = datetime.now(timezone.utc)
-            ub = UserBook(
-                user_id=user.id,
-                book_id=book.id,
-                status=status,
-                rating=rating,
-                date_started=now if status == "currently_reading" else None,
-                date_finished=now if status == "finished" else None,
-            )
-            db.add(ub)
-            imported += 1
-            results.append({"title": title, "status": "imported"})
+            results.append({"title": title, "status": row_status})
         except Exception as e:
             errors += 1
             results.append(

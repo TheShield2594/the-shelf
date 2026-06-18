@@ -11,6 +11,7 @@ from ..models.user_book import UserBook
 from ..models.review import Review
 from ..models.content_rating import ContentRating
 from ..models.related_book import RelatedBook
+from ..models.user import User
 from ..schemas.book import (
     BookCreate,
     BookUpdate,
@@ -22,7 +23,7 @@ from ..schemas.book import (
     ContentRatingAvg,
     OpenLibraryImport,
 )
-from ..auth import get_current_user
+from ..auth import get_current_user, get_current_user_optional
 
 router = APIRouter(prefix="/api/books", tags=["books"])
 
@@ -37,10 +38,12 @@ async def lookup_isbn(
     isbn: str,
     save: bool = False,
     db: AsyncSession = Depends(get_db),
+    user: User | None = Depends(get_current_user_optional),
 ):
     """Look up a book by ISBN. Checks the database first, then OpenLibrary.
 
     If save=True, the book is persisted to the database before returning.
+    Requires authentication when save=True.
     """
     clean_isbn = isbn.replace("-", "").replace(" ", "")
 
@@ -66,7 +69,12 @@ async def lookup_isbn(
                 "jscmd": "data",
             },
         )
-        data = resp.json()
+        if resp.status_code != 200:
+            raise HTTPException(status_code=502, detail="OpenLibrary service unavailable")
+        try:
+            data = resp.json()
+        except Exception:
+            raise HTTPException(status_code=502, detail="Failed to parse OpenLibrary response")
 
     key = f"ISBN:{clean_isbn}"
     if key not in data:
@@ -84,6 +92,10 @@ async def lookup_isbn(
     pub_date = None
 
     if save:
+        if not user:
+            raise HTTPException(
+                status_code=401, detail="Authentication required to save books"
+            )
         book = Book(
             title=title,
             author=authors,
@@ -128,7 +140,12 @@ async def search_external(
             "https://openlibrary.org/search.json",
             params={"q": q, "limit": limit},
         )
-        results = resp.json()
+        if resp.status_code != 200:
+            raise HTTPException(status_code=502, detail="OpenLibrary service unavailable")
+        try:
+            results = resp.json()
+        except Exception:
+            raise HTTPException(status_code=502, detail="Failed to parse OpenLibrary response")
 
     books = []
     for doc in results.get("docs", []):
@@ -139,13 +156,15 @@ async def search_external(
             else None
         )
         isbns = doc.get("isbn", [])
+        pub_year = doc.get("first_publish_year")
+        pub_date = f"{pub_year}-01-01" if pub_year else None
         books.append(
             {
                 "title": doc.get("title", ""),
                 "author": ", ".join(doc.get("author_name", [])),
                 "isbn": isbns[0] if isbns else None,
                 "cover_url": cover,
-                "publication_date": str(doc.get("first_publish_year", "")) or None,
+                "publication_date": pub_date,
                 "description": None,
                 "genres": [],
                 "avg_rating": None,

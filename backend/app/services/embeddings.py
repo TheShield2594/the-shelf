@@ -6,11 +6,11 @@ interface so any future imports don't crash.
 """
 
 
-async def get_embedding(text: str) -> list[float]:
+async def get_embedding(_text: str) -> list[float]:
     """Return an empty embedding vector (stub)."""
     return []
 
 
-async def index_book(book_id: int) -> None:
+async def index_book(_book_id: int) -> None:
     """No-op book indexing stub."""
-    pass
+    ...
