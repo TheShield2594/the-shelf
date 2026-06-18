@@ -16,18 +16,21 @@ A self-hostable, privacy-first book and reading tracker. Track your books, scan 
 ## Quick Start (Docker Compose)
 
 1. Clone the repository:
+
    ```bash
    git clone https://github.com/TheShield2594/the-shelf.git
    cd the-shelf
    ```
 
 2. Copy the environment file and adjust values:
+
    ```bash
    cp .env.example .env
    # Edit .env to set your SECRET_KEY and database password
    ```
 
 3. Start the stack:
+
    ```bash
    docker compose up -d
    ```
@@ -44,6 +47,7 @@ A self-hostable, privacy-first book and reading tracker. Track your books, scan 
 ## Development
 
 ### Backend (FastAPI)
+
 ```bash
 cd backend
 python -m venv .venv
@@ -53,6 +57,7 @@ uvicorn app.main:app --reload --port 8000
 ```
 
 ### Frontend (Next.js)
+
 ```bash
 cd frontend-next
 npm install
@@ -74,7 +79,7 @@ The frontend proxies `/api/*` requests to the backend at `http://localhost:8000`
 
 ## Project Structure
 
-```
+```text
 the-shelf/
 ├── backend/           # FastAPI backend
 │   ├── app/

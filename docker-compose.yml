@@ -20,7 +20,7 @@ services:
     build: ./backend
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-shelf}:${POSTGRES_PASSWORD:-shelf_secret}@db:5432/${POSTGRES_DB:-the_shelf}
-      SECRET_KEY: ${SECRET_KEY:-dev-secret-change-in-production}
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY must be set}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
     depends_on:
       db:
@@ -31,9 +31,9 @@ services:
     build:
       context: ./frontend-next
       args:
-        BACKEND_URL: http://backend:8000
+        BACKEND_URL: ${BACKEND_URL:-http://backend:8000}
     environment:
-      BACKEND_URL: http://backend:8000
+      BACKEND_URL: ${BACKEND_URL:-http://backend:8000}
     ports:
       - "${PORT:-3000}:3000"
     depends_on:

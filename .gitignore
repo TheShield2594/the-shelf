@@ -16,9 +16,8 @@ out/
 build/
 
 # Environment
-.env
-.env.local
-.env.*.local
+.env*
+!.env.example
 
 # IDE
 .idea/
@@ -29,6 +28,3 @@ build/
 # OS
 .DS_Store
 Thumbs.db
-
-# Docker
-*.dockerignore
