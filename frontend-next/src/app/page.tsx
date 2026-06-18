@@ -1,179 +1,106 @@
+'use client';
+
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import { useAuth } from '@/components/AuthProvider';
+import { api } from '@/lib/api';
+import { BookCard } from '@/components/BookCard';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { UserProfile } from '@/types';
 
 export default function HomePage() {
-  return (
-    <div className="min-h-screen">
-      {/* Hero Section */}
-      <section className="bg-gradient-to-br from-shelf-50 via-white to-shelf-100 py-20 px-4">
-        <div className="max-w-4xl mx-auto text-center">
-          <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6 font-serif">
-            A Better Way to
-            <br />
-            <span className="text-shelf-700">Track Books</span>
+  const { user, loading } = useAuth();
+  const [recentBooks, setRecentBooks] = useState<any[]>([]);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+
+  useEffect(() => {
+    api.getBooks('limit=8').then(setRecentBooks).catch(() => {});
+    if (user) {
+      api.getProfile().then(setProfile).catch(() => {});
+    }
+  }, [user]);
+
+  if (loading) return <LoadingSpinner label="Loading..." />;
+
+  // Authenticated: dashboard
+  if (user) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="mb-8">
+          <h1 className="text-3xl font-serif font-bold text-stone-900 dark:text-gray-100">
+            Welcome back, {user.username}
           </h1>
-          <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-            Replace 5-star ratings with{' '}
-            <strong className="text-shelf-700">
-              multi-dimensional ratings
-            </strong>{' '}
-            that capture the complexity of reading experiences.
-          </p>
-
-          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-            <Link
-              href="/demo"
-              className="bg-shelf-600 text-white px-8 py-4 rounded-lg font-semibold text-lg hover:bg-shelf-700 transition-all hover:scale-105 shadow-lg"
-            >
-              Try the Demo
-            </Link>
-            <Link
-              href="/about"
-              className="bg-white text-shelf-700 px-8 py-4 rounded-lg font-semibold text-lg border-2 border-shelf-600 hover:bg-shelf-50 transition-colors"
-            >
-              Learn More
-            </Link>
-          </div>
-
-          {/* Feature highlights */}
-          <div className="grid md:grid-cols-3 gap-6 mt-16">
-            <div className="bg-white rounded-xl p-6 shadow-md border border-shelf-200">
-              <div className="text-4xl mb-3">📊</div>
-              <h3 className="font-bold text-lg mb-2 text-gray-900">
-                7 Dimensions
-              </h3>
-              <p className="text-gray-600 text-sm">
-                Rate pace, emotion, complexity, character, plot, prose, and
-                originality
-              </p>
-            </div>
-
-            <div className="bg-white rounded-xl p-6 shadow-md border border-shelf-200">
-              <div className="text-4xl mb-3">🎯</div>
-              <h3 className="font-bold text-lg mb-2 text-gray-900">
-                Smart Discovery
-              </h3>
-              <p className="text-gray-600 text-sm">
-                Find books by feel, not just genre. "High emotion, lower
-                complexity"
-              </p>
-            </div>
-
-            <div className="bg-white rounded-xl p-6 shadow-md border border-shelf-200">
-              <div className="text-4xl mb-3">🛡️</div>
-              <h3 className="font-bold text-lg mb-2 text-gray-900">
-                Privacy First
-              </h3>
-              <p className="text-gray-600 text-sm">
-                Your data is yours. No selling, no tracking, easy export
-              </p>
-            </div>
-          </div>
+          <p className="text-stone-500 dark:text-gray-400 mt-1">Here's your reading shelf</p>
         </div>
-      </section>
 
-      {/* Why multi-dimensional section */}
-      <section className="py-16 px-4 bg-white">
-        <div className="max-w-4xl mx-auto">
-          <h2 className="text-3xl font-bold text-gray-900 mb-8 text-center font-serif">
-            Why Multi-Dimensional Ratings?
-          </h2>
-
-          <div className="grid md:grid-cols-2 gap-8">
-            <div className="space-y-4">
-              <h3 className="text-xl font-semibold text-red-600 mb-3">
-                ❌ 5-Star Ratings Fail
-              </h3>
-              <ul className="space-y-3 text-gray-700">
-                <li className="flex gap-3">
-                  <span className="text-red-500">•</span>
-                  <span>
-                    <strong>Reductive:</strong> Can't express "great prose,
-                    weak plot"
-                  </span>
-                </li>
-                <li className="flex gap-3">
-                  <span className="text-red-500">•</span>
-                  <span>
-                    <strong>Unstable:</strong> Changes with mood and time
-                  </span>
-                </li>
-                <li className="flex gap-3">
-                  <span className="text-red-500">•</span>
-                  <span>
-                    <strong>Incomparable:</strong> Your 3-star ≠ my 3-star
-                  </span>
-                </li>
-                <li className="flex gap-3">
-                  <span className="text-red-500">•</span>
-                  <span>
-                    <strong>Meaningless:</strong> 3.7 vs 3.8 stars?
-                  </span>
-                </li>
-              </ul>
-            </div>
-
-            <div className="space-y-4">
-              <h3 className="text-xl font-semibold text-green-600 mb-3">
-                ✅ Multi-Dimensional Works
-              </h3>
-              <ul className="space-y-3 text-gray-700">
-                <li className="flex gap-3">
-                  <span className="text-green-500">•</span>
-                  <span>
-                    <strong>Nuanced:</strong> Express complexity naturally
-                  </span>
-                </li>
-                <li className="flex gap-3">
-                  <span className="text-green-500">•</span>
-                  <span>
-                    <strong>Visual:</strong> Radar charts show personality
-                  </span>
-                </li>
-                <li className="flex gap-3">
-                  <span className="text-green-500">•</span>
-                  <span>
-                    <strong>Smart:</strong> Enables "books like X but
-                    faster-paced"
-                  </span>
-                </li>
-                <li className="flex gap-3">
-                  <span className="text-green-500">•</span>
-                  <span>
-                    <strong>Flexible:</strong> Rate only what matters
-                  </span>
-                </li>
-              </ul>
-            </div>
+        {profile && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+            {[
+              { label: 'Read', value: profile.books_read, color: 'text-emerald-600 dark:text-emerald-400' },
+              { label: 'Reading', value: profile.currently_reading, color: 'text-blue-600 dark:text-blue-400' },
+              { label: 'Want to Read', value: profile.want_to_read, color: 'text-amber-600 dark:text-amber-400' },
+              { label: 'Reviews', value: profile.reviews_count, color: 'text-purple-600 dark:text-purple-400' },
+            ].map((stat) => (
+              <div key={stat.label} className="card p-4 text-center">
+                <p className={`text-3xl font-bold ${stat.color}`}>{stat.value}</p>
+                <p className="text-xs text-stone-500 dark:text-gray-400 mt-1">{stat.label}</p>
+              </div>
+            ))}
           </div>
+        )}
 
-          <div className="mt-12 text-center">
-            <Link
-              href="/demo"
-              className="inline-block bg-shelf-600 text-white px-8 py-4 rounded-lg font-semibold hover:bg-shelf-700 transition-all shadow-lg"
-            >
-              See It In Action →
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="bg-gradient-to-br from-shelf-700 to-shelf-900 py-16 px-4 text-white">
-        <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-4xl font-bold mb-4 font-serif">
-            Ready for a Better Book Platform?
-          </h2>
-          <p className="text-xl mb-8 text-shelf-100">
-            Join readers who want nuanced ratings and respect for their privacy.
-          </p>
-          <Link
-            href="/demo"
-            className="inline-block bg-white text-shelf-700 px-8 py-4 rounded-lg font-semibold text-lg hover:bg-shelf-50 transition-all hover:scale-105 shadow-lg"
-          >
-            Try the Demo Now
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-serif font-semibold text-stone-800 dark:text-gray-200">Recently Added</h2>
+          <Link href="/browse" className="text-sm text-shelf-600 dark:text-shelf-500 hover:underline">
+            Browse all →
           </Link>
         </div>
-      </section>
+        {recentBooks.length > 0 ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+            {recentBooks.map((book) => (
+              <BookCard key={book.id} book={book} />
+            ))}
+          </div>
+        ) : (
+          <p className="text-stone-500 dark:text-gray-400">No books in the library yet.</p>
+        )}
+      </div>
+    );
+  }
+
+  // Unauthenticated: landing
+  return (
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+      <div className="text-center mb-16">
+        <h1 className="text-5xl sm:text-6xl font-serif font-bold text-stone-900 dark:text-gray-100 mb-6">
+          Your books.<br/>
+          <span className="text-shelf-700 dark:text-shelf-500">Your shelf.</span>
+        </h1>
+        <p className="text-lg text-stone-600 dark:text-gray-400 max-w-2xl mx-auto mb-8">
+          A self-hostable book tracker with barcode scanning, multi-dimensional ratings,
+          and Goodreads import. Own your reading data.
+        </p>
+        <div className="flex items-center justify-center gap-4">
+          <Link href="/register" className="btn-primary px-6 py-3 text-base">Get Started</Link>
+          <Link href="/login" className="btn-secondary px-6 py-3 text-base">Login</Link>
+        </div>
+      </div>
+
+      <div className="grid md:grid-cols-3 gap-6">
+        {[
+          { title: 'Barcode Scanning', desc: 'Scan a book's barcode to instantly look it up, see reviews, and add it to your shelf.', icon: 'M3 5h2v2H3V5zm4 0h14v2H7V5zM3 11h2v2H3v-2zm4 0h14v2H7v-2zM3 17h2v2H3v-2zm4 0h14v2H7v-2z' },
+          { title: 'Multi-Dimensional Ratings', desc: 'Rate books across 7 dimensions — not just stars. Find your next read by mood, pace, or style.', icon: 'M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5' },
+          { title: 'Goodreads Import', desc: 'Migrate your Goodreads library in seconds with a simple CSV import. No API keys needed.', icon: 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3' },
+        ].map((feature) => (
+          <div key={feature.title} className="card p-6">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-shelf-600 dark:text-shelf-500 mb-4">
+              <path d={feature.icon} />
+            </svg>
+            <h3 className="font-serif font-semibold text-lg text-stone-800 dark:text-gray-200 mb-2">{feature.title}</h3>
+            <p className="text-sm text-stone-500 dark:text-gray-400">{feature.desc}</p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
