@@ -27,7 +27,11 @@ export default function BrowsePage() {
 
     setLoading(true);
     try {
-      const results = await api.getBooks(query ? { q: query, limit: '40' } : { limit: '40' });
+      // Pass the AbortController signal so the fetch can actually be cancelled
+      const results = await api.getBooks(
+        query ? { q: query, limit: '40' } : { limit: '40' },
+        controller.signal
+      );
       // Only update state if this is the latest request
       if (!controller.signal.aborted) {
         setBooks(results);
@@ -47,7 +51,12 @@ export default function BrowsePage() {
     // Skip debounced shelf search when in external mode
     if (searchMode !== 'shelf') return;
     const timer = setTimeout(loadBooks, 300);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      // Abort any in-flight request when effect cleans up
+      // (e.g., component unmount or searchMode changes)
+      abortControllerRef.current?.abort();
+    };
   }, [loadBooks, searchMode]);
 
   const handleExternalSearch = async () => {

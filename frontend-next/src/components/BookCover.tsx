@@ -28,13 +28,16 @@ function BookCoverImpl({ coverUrl, title, author, size = 'md' }: BookCoverProps)
 
   if (coverUrl && !error) {
     const { w, h } = sizePx[size];
+    // xl covers appear on the book detail page above the fold (LCP element)
+    // and should load eagerly; smaller sizes in lists use lazy loading
+    const loadingAttr = size === 'xl' ? 'eager' : 'lazy';
     return (
       <img
         src={coverUrl}
         alt={`Cover of ${title}`}
         width={w}
         height={h}
-        loading="lazy"
+        loading={loadingAttr}
         decoding="async"
         onError={() => setError(true)}
         className={`${sizeClasses[size]} object-cover rounded-lg shadow-md bg-stone-100 dark:bg-gray-800`}

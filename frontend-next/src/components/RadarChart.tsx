@@ -3,20 +3,11 @@
 import { useState, useEffect } from 'react';
 import { Radar, RadarChart as RechartsRadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts';
 import { api } from '@/lib/api';
+import type { RadarChartData as RadarChartDataType } from '@/types';
 
 interface RadarChartProps {
   bookId: number;
 }
-
-const DIMENSION_LABELS: Record<string, string> = {
-  pace: 'Pace',
-  emotional_impact: 'Emotional Impact',
-  complexity: 'Complexity',
-  character_development: 'Character Dev',
-  plot_quality: 'Plot Quality',
-  prose_style: 'Prose Style',
-  originality: 'Originality',
-};
 
 export function RadarChart({ bookId }: RadarChartProps) {
   const [chartData, setChartData] = useState<{ dimension: string; value: number }[]>([]);
@@ -24,13 +15,16 @@ export function RadarChart({ bookId }: RadarChartProps) {
 
   useEffect(() => {
     let cancelled = false;
-    api.getRadarChartData(bookId).then((data: any) => {
+    // Reset loading state when bookId changes to prevent stale data display
+    setLoading(true);
+
+    api.getRadarChartData(bookId).then((data: RadarChartDataType) => {
       if (cancelled) return;
-      const entries = Object.entries(DIMENSION_LABELS).map(([key, label]) => ({
-        dimension: label,
-        value: data[key] ?? 3,
-      }));
-      setChartData(entries);
+      // RadarChartData has a `dimensions` array of { dimension, value } objects
+      setChartData(data.dimensions.map(d => ({
+        dimension: d.dimension,
+        value: d.value ?? 0,
+      })));
       setLoading(false);
     }).catch(() => {
       if (!cancelled) setLoading(false);
