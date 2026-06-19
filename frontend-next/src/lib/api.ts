@@ -16,6 +16,7 @@ import type {
   GamificationStats,
   ReadingSessionOut,
   LogSessionResponse,
+  ChallengeOut,
 } from '@/types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
@@ -335,6 +336,14 @@ class APIClient {
     });
     this.invalidateCache('gamification');
     return result;
+  }
+
+  async getChallenges(): Promise<ChallengeOut[]> {
+    const cached = this.getCached<ChallengeOut[]>('challenges', 10_000);
+    if (cached) return cached;
+    const challenges = await this.request<ChallengeOut[]>('/api/gamification/challenges');
+    this.setCached('challenges', challenges, 10_000);
+    return challenges;
   }
 }
 

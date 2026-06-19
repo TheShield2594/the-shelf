@@ -41,3 +41,13 @@ class LogSessionResponse(BaseModel):
     session: ReadingSessionOut
     stats: GamificationStats
     new_badges: list[BadgeOut] = []
+
+
+class ChallengeOut(BaseModel):
+    code: str
+    name: str
+    description: str
+    progress: int
+    target: int
+    completed: bool
+    period_start: datetime.date

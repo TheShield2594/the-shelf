@@ -275,6 +275,7 @@ from your Want to Read list that match:"
 - **Streaks** for showing up to read, not for page/book volume
 - **XP & levels** earned from logging sessions and engaging deeply (multi-dimensional ratings, finishing long-paused books)
 - **Badges** for meaningful behaviors (first session, 3/7/30-day streaks, picking reading back up after a break, rating a book across all seven dimensions) — never for sheer book count
+- **Weekly personal quests** (read on 4 different days, spend 100 minutes reading, finish a long-dormant book, rate a book across all seven dimensions) — evaluated only against your own activity, never compared across users
 - **A mascot companion** whose mood reflects your current streak/consistency, giving the dashboard warmth without competition
 - **Strictly private:** none of this is shown to other users, posted publicly, or used in any leaderboard — it exists only to help you build your own habit
 

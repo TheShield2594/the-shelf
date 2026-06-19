@@ -8,6 +8,7 @@ from .content_rating import ContentRating
 from .multi_dimensional_rating import MultiDimensionalRating, BookFingerprint
 from .reading_session import ReadingSession
 from .gamification import UserGamification, Badge, UserBadge
+from .challenge import ChallengeCompletion
 
 __all__ = [
     "User",
@@ -24,4 +25,5 @@ __all__ = [
     "UserGamification",
     "Badge",
     "UserBadge",
+    "ChallengeCompletion",
 ]

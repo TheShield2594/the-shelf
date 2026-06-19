@@ -1,5 +1,6 @@
 """Goodreads CSV import router."""
 
+import asyncio
 import csv
 import io
 from datetime import datetime, timezone
@@ -13,10 +14,12 @@ from ..models.user import User
 from ..models.book import Book
 from ..models.user_book import UserBook
 from ..auth import get_current_user
+from .books import _openlibrary_get
 
 router = APIRouter(prefix="/api/goodreads", tags=["goodreads"])
 
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+SEARCH_CONCURRENCY = 5  # cap concurrent OpenLibrary lookups during import
 
 STATUS_MAP = {
     "read": "finished",
@@ -37,6 +40,37 @@ def clean_isbn(raw: str) -> str | None:
     if len(cleaned) == 10 and cleaned[:-1].isdigit() and cleaned[-1] in "0123456789X":
         return cleaned
     return None
+
+
+async def _search_match(title: str, author: str, semaphore: asyncio.Semaphore) -> dict:
+    """Best-effort OpenLibrary title/author match for rows with no usable ISBN.
+
+    Goodreads CSV exports frequently omit ISBN for older or library-sourced
+    books, which otherwise leaves the imported book with no cover art at all.
+    """
+    query = f"{title} {author}".strip() if author else title
+    async with semaphore:
+        try:
+            data = await _openlibrary_get(
+                "https://openlibrary.org/search.json",
+                params={"q": query, "limit": 1},
+            )
+        except HTTPException:
+            return {}
+
+    docs = data.get("docs", [])
+    if not docs:
+        return {}
+    doc = docs[0]
+    isbns = doc.get("isbn", [])
+    matched_isbn = None
+    for candidate in isbns:
+        matched_isbn = clean_isbn(candidate)
+        if matched_isbn:
+            break
+    cover_id = doc.get("cover_i")
+    cover_url = f"https://covers.openlibrary.org/b/id/{cover_id}-M.jpg" if cover_id else None
+    return {"isbn": matched_isbn, "cover_url": cover_url}
 
 
 @router.post("/import")
@@ -77,7 +111,28 @@ async def import_goodreads_csv(
         if isbn:
             all_isbns.add(isbn)
 
-    # Batch lookup: fetch all existing books by ISBN in one query
+    # For rows with no usable ISBN, fall back to an OpenLibrary title/author
+    # search so these books still get matched and get cover art.
+    semaphore = asyncio.Semaphore(SEARCH_CONCURRENCY)
+    search_tasks: dict[int, asyncio.Task] = {}
+    for idx, row in enumerate(rows):
+        title = row.get("Title", "").strip()
+        if not title:
+            continue
+        isbn = clean_isbn(row.get("ISBN", "")) or clean_isbn(row.get("ISBN13", ""))
+        if isbn:
+            continue
+        author = row.get("Author", "").strip()
+        search_tasks[idx] = asyncio.create_task(_search_match(title, author, semaphore))
+
+    search_results: dict[int, dict] = {}
+    for idx, task in search_tasks.items():
+        search_results[idx] = await task
+        matched_isbn = search_results[idx].get("isbn")
+        if matched_isbn:
+            all_isbns.add(matched_isbn)
+
+    # Batch lookup: fetch all existing books by ISBN (explicit + search-matched) in one query
     existing_books_map: dict[str, Book] = {}
     if all_isbns:
         result = await db.execute(
@@ -104,7 +159,7 @@ async def import_goodreads_csv(
     errors = 0
     results = []
 
-    for row in rows:
+    for idx, row in enumerate(rows):
         title = row.get("Title", "").strip()
         if not title:
             skipped += 1
@@ -120,6 +175,9 @@ async def import_goodreads_csv(
                 isbn = clean_isbn(row.get("ISBN", "")) or clean_isbn(
                     row.get("ISBN13", "")
                 )
+                search_match = search_results.get(idx, {})
+                isbn = isbn or search_match.get("isbn")
+
                 rating_str = row.get("My Rating", "0").strip()
                 rating = (
                     int(rating_str) if rating_str and rating_str != "0" else None
@@ -134,7 +192,7 @@ async def import_goodreads_csv(
                 book = existing_books_map.get(isbn) if isbn else None
 
                 if not book:
-                    cover_url = (
+                    cover_url = search_match.get("cover_url") or (
                         f"https://covers.openlibrary.org/b/isbn/{isbn}-M.jpg"
                         if isbn
                         else None

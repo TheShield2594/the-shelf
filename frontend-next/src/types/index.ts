@@ -174,6 +174,16 @@ export interface LogSessionResponse {
   new_badges: BadgeOut[];
 }
 
+export interface ChallengeOut {
+  code: string;
+  name: string;
+  description: string;
+  progress: number;
+  target: number;
+  completed: boolean;
+  period_start: string;
+}
+
 // Dimension metadata for UI
 export interface DimensionInfo {
   key: keyof Omit<MultiDimensionalRating, 'id' | 'user_id' | 'book_id' | 'star_equivalent' | 'created_at' | 'updated_at'>;
