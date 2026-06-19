@@ -138,12 +138,12 @@ class APIClient {
   }
 
   // Books
-  async getBooks(params?: Record<string, string>): Promise<BookSummary[]> {
+  async getBooks(params?: Record<string, string>, signal?: AbortSignal): Promise<BookSummary[]> {
     const query = params ? `?${new URLSearchParams(params).toString()}` : '';
     const cacheKey = `books${query}`;
     const cached = this.getCached<BookSummary[]>(cacheKey, 10_000);
     if (cached) return cached;
-    const books = await this.request<BookSummary[]>(`/api/books${query}`);
+    const books = await this.request<BookSummary[]>(`/api/books${query}`, { signal });
     this.setCached(cacheKey, books, 10_000);
     return books;
   }
@@ -249,7 +249,10 @@ class APIClient {
       method: 'POST',
       body: JSON.stringify(rating),
     });
+    // Invalidate book, fingerprint, and chart cache keys since rating data changed
     this.invalidateCache(`book:${rating.book_id}`);
+    this.invalidateCache(`fingerprint:${rating.book_id}`);
+    this.invalidateCache(`chart:${rating.book_id}`);
     return r;
   }
 
@@ -259,7 +262,10 @@ class APIClient {
 
   async deleteRating(bookId: number): Promise<void> {
     await this.request<void>(`/api/ratings/${bookId}`, { method: 'DELETE' });
+    // Invalidate book, fingerprint, and chart cache keys since rating data changed
     this.invalidateCache(`book:${bookId}`);
+    this.invalidateCache(`fingerprint:${bookId}`);
+    this.invalidateCache(`chart:${bookId}`);
   }
 
   async getBookFingerprint(bookId: number): Promise<BookFingerprint> {
