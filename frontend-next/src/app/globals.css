@@ -67,6 +67,11 @@
   }
 }
 
+@keyframes pageTurn {
+  0%, 100% { transform: rotateY(0deg); }
+  50% { transform: rotateY(-140deg); }
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 8px;

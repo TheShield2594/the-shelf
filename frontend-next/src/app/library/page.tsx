@@ -8,6 +8,7 @@ import { useToast } from '@/components/ToastProvider';
 import { BookCover } from '@/components/BookCover';
 import { StarRating } from '@/components/StarRating';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import Link from 'next/link';
 import { EmptyState } from '@/components/EmptyState';
 import { Tooltip } from '@/components/Tooltip';
 import type { UserBook } from '@/types';
@@ -19,6 +20,13 @@ const STATUS_TABS = [
   { key: 'finished', label: 'Finished' },
   { key: 'dnf', label: 'DNF' },
 ];
+
+const STATUS_STYLES: Record<string, { border: string; dot: string; text: string }> = {
+  currently_reading: { border: 'border-l-blue-500', dot: 'bg-blue-500', text: 'text-blue-700 dark:text-blue-400' },
+  want_to_read: { border: 'border-l-amber-500', dot: 'bg-amber-500', text: 'text-amber-700 dark:text-amber-400' },
+  finished: { border: 'border-l-emerald-500', dot: 'bg-emerald-500', text: 'text-emerald-700 dark:text-emerald-400' },
+  dnf: { border: 'border-l-red-500', dot: 'bg-red-500', text: 'text-red-700 dark:text-red-400' },
+};
 
 export default function LibraryPage() {
   const router = useRouter();
@@ -119,41 +127,53 @@ export default function LibraryPage() {
         <EmptyState
           title="Your library is empty"
           description="Add books by browsing, scanning barcodes, or importing from Goodreads."
-          icon={<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>}
+          icon={<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>}
+          action={
+            <div className="flex items-center gap-3">
+              <Link href="/browse" className="btn-primary">Browse Books</Link>
+              <Link href="/scan" className="btn-secondary">Scan a Barcode</Link>
+            </div>
+          }
         />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
-          {books.map((ub) => (
-            <div key={ub.id} className="card p-4 flex gap-4">
-              <a href={`/books/${ub.book_id}`} className="flex-shrink-0">
-                <BookCover coverUrl={ub.book.cover_url} title={ub.book.title} author={ub.book.author} size="sm" />
-              </a>
-              <div className="flex-1 min-w-0">
-                <a href={`/books/${ub.book_id}`}>
-                  <h3 className="font-serif font-semibold text-sm text-stone-900 dark:text-gray-100 line-clamp-2 hover:text-shelf-700 dark:hover:text-shelf-500 transition-colors">
-                    {ub.book.title}
-                  </h3>
+          {books.map((ub) => {
+            const statusStyle = STATUS_STYLES[ub.status] ?? STATUS_STYLES.want_to_read;
+            return (
+              <div key={ub.id} className={`card border-l-4 ${statusStyle.border} p-4 flex gap-4`}>
+                <a href={`/books/${ub.book_id}`} className="flex-shrink-0">
+                  <BookCover coverUrl={ub.book.cover_url} title={ub.book.title} author={ub.book.author} size="sm" />
                 </a>
-                <p className="text-xs text-stone-500 dark:text-gray-400 line-clamp-1 mb-2">{ub.book.author}</p>
+                <div className="flex-1 min-w-0">
+                  <a href={`/books/${ub.book_id}`}>
+                    <h3 className="font-serif font-semibold text-sm text-stone-900 dark:text-gray-100 line-clamp-2 hover:text-shelf-700 dark:hover:text-shelf-500 transition-colors">
+                      {ub.book.title}
+                    </h3>
+                  </a>
+                  <p className="text-xs text-stone-500 dark:text-gray-400 line-clamp-1 mb-2">{ub.book.author}</p>
 
-                <select
-                  value={ub.status}
-                  onChange={(e) => handleStatusChange(ub.book_id, e.target.value)}
-                  className="w-full text-xs rounded-lg border border-stone-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 py-1 text-stone-700 dark:text-gray-300 mb-2"
-                >
-                  <option value="want_to_read">Want to Read</option>
-                  <option value="currently_reading">Currently Reading</option>
-                  <option value="finished">Finished</option>
-                  <option value="dnf">DNF</option>
-                </select>
+                  <div className="relative mb-2">
+                    <span className={`absolute left-2 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full ${statusStyle.dot}`} />
+                    <select
+                      value={ub.status}
+                      onChange={(e) => handleStatusChange(ub.book_id, e.target.value)}
+                      className={`w-full text-xs font-medium rounded-lg border border-stone-300 dark:border-gray-700 bg-white dark:bg-gray-900 pl-5 pr-2 py-1 ${statusStyle.text}`}
+                    >
+                      <option value="want_to_read">Want to Read</option>
+                      <option value="currently_reading">Currently Reading</option>
+                      <option value="finished">Finished</option>
+                      <option value="dnf">DNF</option>
+                    </select>
+                  </div>
 
-                <div className="flex items-center gap-2">
-                  <StarRating value={ub.rating} onChange={(r) => handleRate(ub.book_id, r)} size="sm" />
-                  <button onClick={() => handleRemove(ub.book_id)} className="ml-auto text-xs text-red-500 hover:text-red-600 dark:text-red-400">Remove</button>
+                  <div className="flex items-center gap-2">
+                    <StarRating value={ub.rating} onChange={(r) => handleRate(ub.book_id, r)} size="sm" />
+                    <button onClick={() => handleRemove(ub.book_id)} className="ml-auto text-xs text-red-500 hover:text-red-600 dark:text-red-400">Remove</button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

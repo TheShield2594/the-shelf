@@ -6,7 +6,7 @@ interface LoadingSpinnerProps {
 }
 
 export function LoadingSpinner({ size = 'md', label }: LoadingSpinnerProps) {
-  const sizeClass = size === 'sm' ? 'w-5 h-5' : size === 'lg' ? 'w-10 h-10' : 'w-7 h-7';
+  const dims = size === 'sm' ? 'w-6 h-8' : size === 'lg' ? 'w-12 h-16' : 'w-8 h-11';
 
   return (
     <div
@@ -14,11 +14,15 @@ export function LoadingSpinner({ size = 'md', label }: LoadingSpinnerProps) {
       role="status"
       aria-busy="true"
       aria-label={label || 'Loading'}
+      style={{ perspective: '200px' }}
     >
-      <svg className={`${sizeClass} animate-spin text-shelf-600 dark:text-shelf-500`} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-      </svg>
+      <div className={`relative ${dims}`} aria-hidden="true">
+        <div className="absolute inset-0 rounded-sm bg-shelf-200 dark:bg-shelf-900" />
+        <div
+          className="absolute inset-0 rounded-sm bg-shelf-600 dark:bg-shelf-500 origin-left"
+          style={{ animation: 'pageTurn 1.1s ease-in-out infinite' }}
+        />
+      </div>
       {label && <p className="text-sm text-stone-500 dark:text-gray-400">{label}</p>}
     </div>
   );

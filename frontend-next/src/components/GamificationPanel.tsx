@@ -97,26 +97,28 @@ export function GamificationPanel() {
 
   return (
     <div className="space-y-6">
-      <MascotCompanion mood={stats.mascot_mood} streak={stats.current_streak} />
+      <div className="rounded-xl p-5 bg-gradient-to-br from-shelf-600 via-shelf-700 to-stone-900 dark:from-shelf-800 dark:via-shelf-900 dark:to-gray-950 shadow-lg">
+        <MascotCompanion mood={stats.mascot_mood} streak={stats.current_streak} />
 
-      <div className="card p-5">
-        <div className="flex items-center justify-between mb-2">
-          <p className="font-serif font-semibold text-stone-900 dark:text-gray-100">
-            Level {stats.level}
-          </p>
-          <p className="text-xs text-stone-500 dark:text-gray-400">
-            {xpIntoLevel} / {XP_PER_LEVEL} XP
+        <div className="mt-5 pt-4 border-t border-white/15">
+          <div className="flex items-center justify-between mb-2">
+            <p className="font-serif font-semibold text-white">
+              Level {stats.level}
+            </p>
+            <p className="text-xs text-white/70">
+              {xpIntoLevel} / {XP_PER_LEVEL} XP
+            </p>
+          </div>
+          <div className="w-full h-2 rounded-full bg-white/15 overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-amber-300 to-shelf-300 transition-all"
+              style={{ width: `${(xpIntoLevel / XP_PER_LEVEL) * 100}%` }}
+            />
+          </div>
+          <p className="text-xs text-white/70 mt-2">
+            Longest streak: {stats.longest_streak} day{stats.longest_streak === 1 ? '' : 's'}
           </p>
         </div>
-        <div className="w-full h-2 rounded-full bg-stone-200 dark:bg-gray-700 overflow-hidden">
-          <div
-            className="h-full bg-shelf-500 transition-all"
-            style={{ width: `${(xpIntoLevel / XP_PER_LEVEL) * 100}%` }}
-          />
-        </div>
-        <p className="text-xs text-stone-500 dark:text-gray-400 mt-2">
-          Longest streak: {stats.longest_streak} day{stats.longest_streak === 1 ? '' : 's'}
-        </p>
       </div>
 
       <div className="card p-5">

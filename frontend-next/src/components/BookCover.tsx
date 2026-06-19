@@ -53,13 +53,29 @@ function BookCoverImpl({ coverUrl, title, author, size = 'md' }: BookCoverProps)
     .join('')
     .toUpperCase();
 
+  // Deterministic hue offset per title so fallback covers aren't all identical
+  const hueSeed = title.split('').reduce((sum, ch) => sum + ch.charCodeAt(0), 0) % 5;
+  const palettes = [
+    'from-shelf-300 to-shelf-600 dark:from-shelf-800 dark:to-shelf-950',
+    'from-emerald-300 to-emerald-700 dark:from-emerald-900 dark:to-emerald-950',
+    'from-sky-300 to-sky-700 dark:from-sky-900 dark:to-sky-950',
+    'from-rose-300 to-rose-700 dark:from-rose-900 dark:to-rose-950',
+    'from-amber-300 to-amber-700 dark:from-amber-900 dark:to-amber-950',
+  ];
+
   return (
     <div
-      className={`${sizeClasses[size]} rounded-lg shadow-md flex flex-col items-center justify-center bg-gradient-to-br from-shelf-200 to-shelf-400 dark:from-gray-800 dark:to-gray-700 p-3 text-center`}
+      className={`${sizeClasses[size]} relative rounded-r-lg rounded-l-sm shadow-md flex flex-col items-center justify-center bg-gradient-to-br ${palettes[hueSeed]} p-3 text-center overflow-hidden`}
     >
-      <span className="text-2xl font-bold font-serif text-shelf-700 dark:text-shelf-400 mb-1">{initials}</span>
-      <span className="text-[10px] text-stone-600 dark:text-gray-400 line-clamp-3 leading-tight">{title}</span>
-      <span className="text-[9px] text-stone-500 dark:text-gray-500 mt-1 line-clamp-1">{author}</span>
+      {/* spine */}
+      <div className="absolute left-0 top-0 bottom-0 w-[6px] bg-black/20" />
+      <div className="absolute left-[6px] top-0 bottom-0 w-px bg-white/30" />
+      {/* page-edge highlight */}
+      <div className="absolute right-0 top-1 bottom-1 w-1 bg-white/25 rounded-r" />
+
+      <span className="text-2xl font-bold font-serif text-white drop-shadow-sm mb-1">{initials}</span>
+      <span className="text-[10px] text-white/90 line-clamp-3 leading-tight">{title}</span>
+      <span className="text-[9px] text-white/70 mt-1 line-clamp-1 italic font-serif">{author}</span>
     </div>
   );
 }

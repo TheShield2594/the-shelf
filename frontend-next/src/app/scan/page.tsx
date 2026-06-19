@@ -28,6 +28,17 @@ export default function ScanPage() {
     if (!user) router.push('/login');
   }, [user, authLoading, router]);
 
+  const stopScanner = () => {
+    if (scannerRef.current) {
+      scannerRef.current.stop().catch(() => {});
+      scannerRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    return () => stopScanner();
+  }, []);
+
   if (authLoading || !user) return <LoadingSpinner />;
 
   const startScanner = async () => {
@@ -51,17 +62,6 @@ export default function ScanPage() {
       setScanState('error');
     }
   };
-
-  const stopScanner = () => {
-    if (scannerRef.current) {
-      scannerRef.current.stop().catch(() => {});
-      scannerRef.current = null;
-    }
-  };
-
-  useEffect(() => {
-    return () => stopScanner();
-  }, []);
 
   const lookupIsbn = async (isbnToLookup: string) => {
     setScanState('lookup_scanning');
