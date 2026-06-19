@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24 * 7  # 1 week
     cors_origins: str = "http://localhost:3000"
+    google_books_api_key: str | None = None
 
     model_config = {"env_file": ".env"}
 

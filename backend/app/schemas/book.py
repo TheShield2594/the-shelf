@@ -44,6 +44,7 @@ class BookOut(BaseModel):
     id: int
     title: str
     author: str
+    author_bio: str | None = None
     isbn: str | None = None
     description: str | None = None
     cover_url: str | None = None
@@ -52,6 +53,9 @@ class BookOut(BaseModel):
     genres: list[GenreOut] = []
     avg_rating: float | None = None
     rating_count: int = 0
+    external_rating: float | None = None
+    external_rating_count: int | None = None
+    buy_link: str | None = None
     content_rating: ContentRatingAvg | None = None
     fingerprint: Optional[BookFingerprintResponse] = None  # Multi-dimensional ratings
 
@@ -66,6 +70,9 @@ class BookSummary(BaseModel):
     genres: list[GenreOut] = []
     avg_rating: float | None = None
     rating_count: int = 0
+    external_rating: float | None = None
+    external_rating_count: int | None = None
+    buy_link: str | None = None
     content_rating: ContentRatingAvg | None = None
     fingerprint: Optional[BookFingerprintResponse] = None  # Multi-dimensional ratings
 

@@ -5,6 +5,7 @@ from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from ..config import settings
 from ..database import get_db
 from ..models.book import Book, book_genres
 from ..models.genre import Genre
@@ -69,6 +70,142 @@ async def _openlibrary_get(url: str, params: dict) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Enrichment helpers (Google Books + OpenLibrary authors/subjects)
+#
+# These augment OpenLibrary's bibliographic data with description/rating/
+# genre/buy-link data Open Library doesn't have. They are best-effort: any
+# failure returns an empty result rather than failing the request, since a
+# missing rating shouldn't block an ISBN lookup or import.
+# ---------------------------------------------------------------------------
+
+_GENRE_NOISE = {
+    "protected daisy",
+    "in library",
+    "accessible book",
+    "large type books",
+    "open library staff picks",
+    "overdrive",
+    "internet archive wishlist",
+    "lending library",
+    "popular print disabled books",
+}
+
+
+async def _google_books_get(params: dict) -> dict:
+    """Best-effort GET against the Google Books API. Returns {} on any failure."""
+    client = await get_http_client()
+    if settings.google_books_api_key:
+        params = {**params, "key": settings.google_books_api_key}
+    try:
+        resp = await client.get(
+            "https://www.googleapis.com/books/v1/volumes", params=params
+        )
+    except httpx.HTTPError:
+        return {}
+    if resp.status_code != 200:
+        return {}
+    try:
+        return resp.json()
+    except Exception:
+        return {}
+
+
+async def _fetch_google_books_enrichment(
+    isbn: str | None, title: str | None = None, author: str | None = None
+) -> dict:
+    """Fetch description/rating/genres/buy-link for a book from Google Books."""
+    if isbn:
+        query = f"isbn:{isbn}"
+    elif title:
+        query = f"intitle:{title}"
+        if author:
+            query += f"+inauthor:{author}"
+    else:
+        return {}
+
+    data = await _google_books_get({"q": query, "maxResults": 1})
+    items = data.get("items")
+    if not items:
+        return {}
+
+    info = items[0].get("volumeInfo", {})
+    sale = items[0].get("saleInfo", {})
+    return {
+        "description": info.get("description"),
+        "rating": info.get("averageRating"),
+        "rating_count": info.get("ratingsCount"),
+        "categories": info.get("categories", []),
+        "buy_link": sale.get("buyLink"),
+    }
+
+
+async def _fetch_openlibrary_author_bio(author_url: str | None) -> str | None:
+    """Fetch an author's bio from OpenLibrary's Authors API given their profile URL."""
+    if not author_url:
+        return None
+    author_key = author_url.rstrip("/").rsplit("/", 1)[-1]
+    client = await get_http_client()
+    try:
+        resp = await client.get(f"https://openlibrary.org/authors/{author_key}.json")
+    except httpx.HTTPError:
+        return None
+    if resp.status_code != 200:
+        return None
+    try:
+        data = resp.json()
+    except Exception:
+        return None
+    bio = data.get("bio")
+    return bio.get("value") if isinstance(bio, dict) else bio
+
+
+def _extract_subject_names(subjects) -> list[str]:
+    """Normalize OpenLibrary's subjects field, which may be dicts or plain strings."""
+    names = []
+    for s in subjects or []:
+        name = s.get("name") if isinstance(s, dict) else s
+        if name:
+            names.append(name)
+    return names
+
+
+def _clean_genre_names(*sources: list[str], limit: int = 8) -> list[str]:
+    """Flatten, dedupe, and filter genre/category names from multiple sources.
+
+    Splits Google's "Fiction / Thrillers" BISAC-style categories into separate
+    tags and drops OpenLibrary's non-genre administrative subjects.
+    """
+    seen = set()
+    cleaned = []
+    for source in sources:
+        for raw in source or []:
+            for part in raw.split(" / "):
+                name = part.strip()
+                key = name.lower()
+                if not name or key in seen or key in _GENRE_NOISE:
+                    continue
+                seen.add(key)
+                cleaned.append(name)
+                if len(cleaned) >= limit:
+                    return cleaned
+    return cleaned
+
+
+async def _get_or_create_genres(db: AsyncSession, names: list[str]) -> list[Genre]:
+    """Match genre names to existing Genre rows case-insensitively, creating new ones."""
+    genres = []
+    for name in names:
+        result = await db.execute(select(Genre).where(Genre.name.ilike(name)))
+        genre = result.scalar_one_or_none()
+        if not genre:
+            genre = Genre(name=name)
+            db.add(genre)
+            await db.flush()
+        genres.append(genre)
+    return genres
+
+
+# ---------------------------------------------------------------------------
 # Lookup & Search endpoints (must be defined before /{book_id})
 # ---------------------------------------------------------------------------
 
@@ -117,12 +254,21 @@ async def lookup_isbn(
 
     ol = data[key]
     title = ol.get("title", "")
-    authors = ", ".join(a.get("name", "") for a in ol.get("authors", []))
+    authors_raw = ol.get("authors", [])
+    authors = ", ".join(a.get("name", "") for a in authors_raw)
     cover = ol.get("cover", {}).get(
         "large", ol.get("cover", {}).get("medium")
     )
     desc = ol.get("notes") if isinstance(ol.get("notes"), str) else None
     pub_date = None
+    subjects = _extract_subject_names(ol.get("subjects"))
+
+    google = await _fetch_google_books_enrichment(clean_isbn, title, authors)
+    author_bio = await _fetch_openlibrary_author_bio(
+        authors_raw[0].get("url") if authors_raw else None
+    )
+    desc = desc or google.get("description")
+    genre_names = _clean_genre_names(subjects, google.get("categories", []))
 
     if save:
         if not user:
@@ -132,11 +278,16 @@ async def lookup_isbn(
         book = Book(
             title=title,
             author=authors,
+            author_bio=author_bio,
             isbn=clean_isbn,
             description=desc,
             cover_url=cover,
             publication_date=pub_date,
+            external_rating=google.get("rating"),
+            external_rating_count=google.get("rating_count"),
+            buy_link=google.get("buy_link"),
         )
+        book.genres = await _get_or_create_genres(db, genre_names)
         db.add(book)
         await db.commit()
         await db.refresh(book)
@@ -150,13 +301,17 @@ async def lookup_isbn(
         "book": {
             "title": title,
             "author": authors,
+            "author_bio": author_bio,
             "isbn": clean_isbn,
             "description": desc,
             "cover_url": cover,
             "publication_date": pub_date,
-            "genres": [],
+            "genres": genre_names,
             "avg_rating": None,
             "rating_count": 0,
+            "external_rating": google.get("rating"),
+            "external_rating_count": google.get("rating_count"),
+            "buy_link": google.get("buy_link"),
             "content_rating": None,
         },
     }
@@ -170,7 +325,11 @@ async def search_external(
     """Search OpenLibrary for books without saving to database."""
     results = await _openlibrary_get(
         "https://openlibrary.org/search.json",
-        params={"q": q, "limit": limit},
+        params={
+            "q": q,
+            "limit": limit,
+            "fields": "title,author_name,isbn,cover_i,first_publish_year,subject",
+        },
     )
 
     books = []
@@ -184,6 +343,10 @@ async def search_external(
         isbns = doc.get("isbn", [])
         pub_year = doc.get("first_publish_year")
         pub_date = f"{pub_year}-01-01" if pub_year else None
+        # search.json's "subject" field is free (no extra request); per-result
+        # Google Books/author-bio enrichment is skipped here since this can
+        # return up to 50 results and we don't want 50x extra external calls.
+        genre_names = _clean_genre_names(doc.get("subject", []))
         books.append(
             {
                 "title": doc.get("title", ""),
@@ -192,7 +355,7 @@ async def search_external(
                 "cover_url": cover,
                 "publication_date": pub_date,
                 "description": None,
-                "genres": [],
+                "genres": genre_names,
                 "avg_rating": None,
                 "rating_count": 0,
                 "content_rating": None,
@@ -354,6 +517,9 @@ def _book_to_summary(book: Book, avg_rating, rating_count, content_rating) -> di
         "genres": [{"id": g.id, "name": g.name} for g in book.genres],
         "avg_rating": avg_rating,
         "rating_count": rating_count,
+        "external_rating": book.external_rating,
+        "external_rating_count": book.external_rating_count,
+        "buy_link": book.buy_link,
         "content_rating": content_rating,
     }
 
@@ -441,6 +607,7 @@ async def get_book(book_id: int, db: AsyncSession = Depends(get_db)):
         "id": book.id,
         "title": book.title,
         "author": book.author,
+        "author_bio": book.author_bio,
         "isbn": book.isbn,
         "description": book.description,
         "cover_url": book.cover_url,
@@ -449,6 +616,9 @@ async def get_book(book_id: int, db: AsyncSession = Depends(get_db)):
         "genres": [{"id": g.id, "name": g.name} for g in book.genres],
         "avg_rating": avg_r,
         "rating_count": r_count,
+        "external_rating": book.external_rating,
+        "external_rating_count": book.external_rating_count,
+        "buy_link": book.buy_link,
         "content_rating": cr,
         "reviews": [
             {
@@ -649,12 +819,15 @@ async def import_from_open_library(
             )
         ol = result[key]
         title = ol.get("title", "")
-        authors = ", ".join(a.get("name", "") for a in ol.get("authors", []))
+        authors_raw = ol.get("authors", [])
+        authors = ", ".join(a.get("name", "") for a in authors_raw)
         cover = ol.get("cover", {}).get(
             "large", ol.get("cover", {}).get("medium")
         )
         desc = ol.get("notes") if isinstance(ol.get("notes"), str) else None
         pub_date = None
+        subjects = _extract_subject_names(ol.get("subjects"))
+        author_url = authors_raw[0].get("url") if authors_raw else None
     else:
         results = await _openlibrary_get(
             "https://openlibrary.org/search.json",
@@ -675,21 +848,40 @@ async def import_from_open_library(
         )
         desc = None
         pub_date = None
+        subjects = doc.get("subject", [])
+        author_keys = doc.get("author_key", [])
+        author_url = (
+            f"https://openlibrary.org/authors/{author_keys[0]}"
+            if author_keys
+            else None
+        )
+
+    google = await _fetch_google_books_enrichment(
+        data.query if data.isbn else None, title, authors
+    )
+    author_bio = await _fetch_openlibrary_author_bio(author_url)
+    desc = desc or google.get("description")
+    genre_names = _clean_genre_names(subjects, google.get("categories", []))
 
     book = Book(
         title=title,
         author=authors,
+        author_bio=author_bio,
         isbn=data.query if data.isbn else None,
         description=desc,
         cover_url=cover,
         publication_date=pub_date,
+        external_rating=google.get("rating"),
+        external_rating_count=google.get("rating_count"),
+        buy_link=google.get("buy_link"),
     )
+    book.genres = await _get_or_create_genres(db, genre_names)
     db.add(book)
     await db.commit()
     await db.refresh(book)
     return {
         **book.__dict__,
-        "genres": [],
+        "genres": [{"id": g.id, "name": g.name} for g in book.genres],
         "avg_rating": None,
         "rating_count": 0,
         "content_rating": None,
