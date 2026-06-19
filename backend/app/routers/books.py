@@ -1,3 +1,4 @@
+import asyncio
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func, or_
@@ -29,13 +30,42 @@ router = APIRouter(prefix="/api/books", tags=["books"])
 
 # Reusable httpx client for external API calls
 _http_client: httpx.AsyncClient | None = None
+_http_client_lock = asyncio.Lock()
 
 
 async def get_http_client() -> httpx.AsyncClient:
+    """Return the shared httpx.AsyncClient, creating it if needed.
+
+    Uses an asyncio.Lock with double-check to prevent concurrent
+    requests from creating multiple client instances.
+    """
     global _http_client
-    if _http_client is None or _http_client.is_closed:
+    if _http_client is not None and not _http_client.is_closed:
+        return _http_client
+    async with _http_client_lock:
+        # Double-check after acquiring the lock
+        if _http_client is not None and not _http_client.is_closed:
+            return _http_client
         _http_client = httpx.AsyncClient(timeout=10)
     return _http_client
+
+
+async def _openlibrary_get(url: str, params: dict) -> dict:
+    """Shared helper for OpenLibrary GET requests.
+
+    Wraps httpx transport errors and JSON parse errors into 502 responses.
+    """
+    client = await get_http_client()
+    try:
+        resp = await client.get(url, params=params)
+    except httpx.HTTPError:
+        raise HTTPException(status_code=502, detail="OpenLibrary service unavailable")
+    if resp.status_code != 200:
+        raise HTTPException(status_code=502, detail="OpenLibrary service unavailable")
+    try:
+        return resp.json()
+    except Exception:
+        raise HTTPException(status_code=502, detail="Failed to parse OpenLibrary response")
 
 
 # ---------------------------------------------------------------------------
@@ -70,8 +100,7 @@ async def lookup_isbn(
         }
 
     # Query OpenLibrary
-    client = await get_http_client()
-    resp = await client.get(
+    data = await _openlibrary_get(
         "https://openlibrary.org/api/books.json",
         params={
             "bibkeys": f"ISBN:{clean_isbn}",
@@ -79,12 +108,6 @@ async def lookup_isbn(
             "jscmd": "data",
         },
     )
-    if resp.status_code != 200:
-        raise HTTPException(status_code=502, detail="OpenLibrary service unavailable")
-    try:
-        data = resp.json()
-    except Exception:
-        raise HTTPException(status_code=502, detail="Failed to parse OpenLibrary response")
 
     key = f"ISBN:{clean_isbn}"
     if key not in data:
@@ -145,17 +168,10 @@ async def search_external(
     limit: int = Query(10, le=50),
 ):
     """Search OpenLibrary for books without saving to database."""
-    client = await get_http_client()
-    resp = await client.get(
+    results = await _openlibrary_get(
         "https://openlibrary.org/search.json",
         params={"q": q, "limit": limit},
     )
-    if resp.status_code != 200:
-        raise HTTPException(status_code=502, detail="OpenLibrary service unavailable")
-    try:
-        results = resp.json()
-    except Exception:
-        raise HTTPException(status_code=502, detail="Failed to parse OpenLibrary response")
 
     books = []
     for doc in results.get("docs", []):
@@ -617,9 +633,8 @@ async def import_from_open_library(
     db: AsyncSession = Depends(get_db),
     _user=Depends(get_current_user),
 ):
-    client = await get_http_client()
     if data.isbn:
-        resp = await client.get(
+        result = await _openlibrary_get(
             "https://openlibrary.org/api/books.json",
             params={
                 "bibkeys": f"ISBN:{data.query}",
@@ -627,7 +642,6 @@ async def import_from_open_library(
                 "jscmd": "data",
             },
         )
-        result = resp.json()
         key = f"ISBN:{data.query}"
         if key not in result:
             raise HTTPException(
@@ -642,11 +656,10 @@ async def import_from_open_library(
         desc = ol.get("notes") if isinstance(ol.get("notes"), str) else None
         pub_date = None
     else:
-        resp = await client.get(
+        results = await _openlibrary_get(
             "https://openlibrary.org/search.json",
             params={"q": data.query, "limit": 1},
         )
-        results = resp.json()
         if not results.get("docs"):
             raise HTTPException(
                 status_code=404, detail="Book not found on Open Library"
