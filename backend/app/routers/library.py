@@ -12,7 +12,7 @@ from ..models.book import Book
 from ..schemas.library import UserBookCreate, UserBookUpdate, UserBookOut
 from ..schemas.book import ContentRatingAvg
 from ..auth import get_current_user
-from .books import _compute_book_stats
+from .books import _compute_book_stats, _compute_batch_stats
 
 router = APIRouter(prefix="/api/library", tags=["library"])
 
@@ -35,9 +35,13 @@ async def get_library(
     result = await db.execute(stmt)
     user_books = result.scalars().all()
 
+    # Batch compute stats for all books — eliminates N+1 query pattern
+    book_ids = [ub.book_id for ub in user_books]
+    stats = await _compute_batch_stats(db, book_ids)
+
     out = []
     for ub in user_books:
-        avg_r, r_count, cr = await _compute_book_stats(db, ub.book_id)
+        avg_r, r_count, cr = stats.get(ub.book_id, (None, 0, None))
         book_data = {
             "id": ub.book.id,
             "title": ub.book.title,
@@ -144,14 +148,8 @@ async def update_library_entry(
         ub.rating = data.rating
 
     await db.commit()
+    # No need to re-query — we already have the fully loaded object
     await db.refresh(ub)
-
-    result2 = await db.execute(
-        select(UserBook)
-        .options(selectinload(UserBook.book).selectinload(Book.genres))
-        .where(UserBook.id == ub.id)
-    )
-    ub = result2.scalar_one()
     avg_r, r_count, cr = await _compute_book_stats(db, ub.book_id)
     return {
         "id": ub.id,

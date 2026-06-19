@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 
 from .config import settings
 from .database import engine, Base
@@ -22,9 +23,17 @@ async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield
+    # Close shared HTTP client to prevent socket leaks
+    from .routers.books import get_http_client
+    client = await get_http_client()
+    await client.aclose()
+    await engine.dispose()
 
 
 app = FastAPI(title="The Shelf", version="1.0.0", lifespan=lifespan)
+
+# Gzip compress responses > 1KB
+app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 app.add_middleware(
     CORSMiddleware,

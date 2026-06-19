@@ -20,11 +20,34 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
 class APIClient {
   private baseURL: string;
   private token: string | null = null;
+  private cache: Map<string, { data: unknown; expiry: number }> = new Map();
 
   constructor(baseURL: string) {
     this.baseURL = baseURL;
     if (typeof window !== 'undefined') {
       this.token = localStorage.getItem('auth_token');
+    }
+  }
+
+  private getCached<T>(key: string, maxAge: number): T | null {
+    const entry = this.cache.get(key);
+    if (entry && entry.expiry > Date.now()) {
+      return entry.data as T;
+    }
+    return null;
+  }
+
+  private setCached(key: string, data: unknown, maxAge: number) {
+    this.cache.set(key, { data, expiry: Date.now() + maxAge });
+  }
+
+  private invalidateCache(pattern?: string) {
+    if (pattern) {
+      for (const key of this.cache.keys()) {
+        if (key.includes(pattern)) this.cache.delete(key);
+      }
+    } else {
+      this.cache.clear();
     }
   }
 
@@ -73,6 +96,7 @@ class APIClient {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('auth_token');
     }
+    this.invalidateCache();
   }
 
   async login(username: string, password: string): Promise<AuthTokens> {
@@ -98,28 +122,48 @@ class APIClient {
   }
 
   async getCurrentUser(): Promise<User> {
-    return this.request<User>('/api/auth/me');
+    const cached = this.getCached<User>('current_user', 30_000);
+    if (cached) return cached;
+    const user = await this.request<User>('/api/auth/me');
+    this.setCached('current_user', user, 30_000);
+    return user;
   }
 
   async getProfile(): Promise<UserProfile> {
-    return this.request<UserProfile>('/api/auth/profile');
+    const cached = this.getCached<UserProfile>('profile', 15_000);
+    if (cached) return cached;
+    const profile = await this.request<UserProfile>('/api/auth/profile');
+    this.setCached('profile', profile, 15_000);
+    return profile;
   }
 
   // Books
-  async getBooks(params?: Record<string, string>): Promise<BookSummary[]> {
+  async getBooks(params?: Record<string, string>, signal?: AbortSignal): Promise<BookSummary[]> {
     const query = params ? `?${new URLSearchParams(params).toString()}` : '';
-    return this.request<BookSummary[]>(`/api/books${query}`);
+    const cacheKey = `books${query}`;
+    const cached = this.getCached<BookSummary[]>(cacheKey, 10_000);
+    if (cached) return cached;
+    const books = await this.request<BookSummary[]>(`/api/books${query}`, { signal });
+    this.setCached(cacheKey, books, 10_000);
+    return books;
   }
 
   async getBook(id: number): Promise<Book> {
-    return this.request<Book>(`/api/books/${id}`);
+    const cacheKey = `book:${id}`;
+    const cached = this.getCached<Book>(cacheKey, 15_000);
+    if (cached) return cached;
+    const book = await this.request<Book>(`/api/books/${id}`);
+    this.setCached(cacheKey, book, 15_000);
+    return book;
   }
 
   async createBook(data: Partial<BookSummary>): Promise<Book> {
-    return this.request<Book>('/api/books', {
+    const book = await this.request<Book>('/api/books', {
       method: 'POST',
       body: JSON.stringify(data),
     });
+    this.invalidateCache('books');
+    return book;
   }
 
   async lookupISBN(isbn: string, save = false): Promise<ISBNDetailLookupResult> {
@@ -135,33 +179,45 @@ class APIClient {
   // Library
   async getLibrary(status?: string): Promise<UserBook[]> {
     const query = status ? `?status=${status}` : '';
-    return this.request<UserBook[]>(`/api/library${query}`);
+    const cacheKey = `library${query}`;
+    const cached = this.getCached<UserBook[]>(cacheKey, 5_000);
+    if (cached) return cached;
+    const books = await this.request<UserBook[]>(`/api/library${query}`);
+    this.setCached(cacheKey, books, 5_000);
+    return books;
   }
 
   async addToLibrary(bookId: number, status: string): Promise<UserBook> {
-    return this.request<UserBook>('/api/library', {
+    const ub = await this.request<UserBook>('/api/library', {
       method: 'POST',
       body: JSON.stringify({ book_id: bookId, status }),
     });
+    this.invalidateCache('library');
+    return ub;
   }
 
   async updateLibraryEntry(bookId: number, data: { status?: string; rating?: number }): Promise<UserBook> {
-    return this.request<UserBook>(`/api/library/${bookId}`, {
+    const ub = await this.request<UserBook>(`/api/library/${bookId}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     });
+    this.invalidateCache('library');
+    return ub;
   }
 
   async removeFromLibrary(bookId: number): Promise<void> {
-    return this.request<void>(`/api/library/${bookId}`, { method: 'DELETE' });
+    await this.request<void>(`/api/library/${bookId}`, { method: 'DELETE' });
+    this.invalidateCache('library');
   }
 
   // Reviews
   async createReview(bookId: number, reviewText: string): Promise<any> {
-    return this.request<any>('/api/reviews', {
+    const review = await this.request<any>('/api/reviews', {
       method: 'POST',
       body: JSON.stringify({ book_id: bookId, review_text: reviewText }),
     });
+    this.invalidateCache(`book:${bookId}`);
+    return review;
   }
 
   // Goodreads import
@@ -189,10 +245,15 @@ class APIClient {
 
   // Multi-dimensional ratings
   async createOrUpdateRating(rating: Partial<MultiDimensionalRating>): Promise<MultiDimensionalRating> {
-    return this.request<MultiDimensionalRating>('/api/ratings', {
+    const r = await this.request<MultiDimensionalRating>('/api/ratings', {
       method: 'POST',
       body: JSON.stringify(rating),
     });
+    // Invalidate book, fingerprint, and chart cache keys since rating data changed
+    this.invalidateCache(`book:${rating.book_id}`);
+    this.invalidateCache(`fingerprint:${rating.book_id}`);
+    this.invalidateCache(`chart:${rating.book_id}`);
+    return r;
   }
 
   async getUserRating(bookId: number): Promise<MultiDimensionalRating> {
@@ -200,15 +261,29 @@ class APIClient {
   }
 
   async deleteRating(bookId: number): Promise<void> {
-    return this.request<void>(`/api/ratings/${bookId}`, { method: 'DELETE' });
+    await this.request<void>(`/api/ratings/${bookId}`, { method: 'DELETE' });
+    // Invalidate book, fingerprint, and chart cache keys since rating data changed
+    this.invalidateCache(`book:${bookId}`);
+    this.invalidateCache(`fingerprint:${bookId}`);
+    this.invalidateCache(`chart:${bookId}`);
   }
 
   async getBookFingerprint(bookId: number): Promise<BookFingerprint> {
-    return this.request<BookFingerprint>(`/api/ratings/${bookId}/fingerprint`);
+    const cacheKey = `fingerprint:${bookId}`;
+    const cached = this.getCached<BookFingerprint>(cacheKey, 30_000);
+    if (cached) return cached;
+    const fp = await this.request<BookFingerprint>(`/api/ratings/${bookId}/fingerprint`);
+    this.setCached(cacheKey, fp, 30_000);
+    return fp;
   }
 
   async getRadarChartData(bookId: number): Promise<RadarChartData> {
-    return this.request<RadarChartData>(`/api/ratings/${bookId}/chart-data`);
+    const cacheKey = `chart:${bookId}`;
+    const cached = this.getCached<RadarChartData>(cacheKey, 30_000);
+    if (cached) return cached;
+    const data = await this.request<RadarChartData>(`/api/ratings/${bookId}/chart-data`);
+    this.setCached(cacheKey, data, 30_000);
+    return data;
   }
 }
 

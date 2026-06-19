@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '@/lib/api';
 import { BookCard } from '@/components/BookCard';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
@@ -17,16 +17,33 @@ export default function BrowsePage() {
   const [importing, setImporting] = useState<number | null>(null);
   const [importedKeys, setImportedKeys] = useState<Set<string>>(new Set());
   const [previewBook, setPreviewBook] = useState<BookSummary | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const loadBooks = useCallback(async () => {
+    // Cancel any in-flight request
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setLoading(true);
     try {
-      const results = await api.getBooks(query ? { q: query, limit: '40' } : { limit: '40' });
-      setBooks(results);
+      // Pass the AbortController signal so the fetch can actually be cancelled
+      const results = await api.getBooks(
+        query ? { q: query, limit: '40' } : { limit: '40' },
+        controller.signal
+      );
+      // Only update state if this is the latest request
+      if (!controller.signal.aborted) {
+        setBooks(results);
+      }
     } catch {
-      setBooks([]);
+      if (!controller.signal.aborted) {
+        setBooks([]);
+      }
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) {
+        setLoading(false);
+      }
     }
   }, [query]);
 
@@ -34,7 +51,12 @@ export default function BrowsePage() {
     // Skip debounced shelf search when in external mode
     if (searchMode !== 'shelf') return;
     const timer = setTimeout(loadBooks, 300);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      // Abort any in-flight request when effect cleans up
+      // (e.g., component unmount or searchMode changes)
+      abortControllerRef.current?.abort();
+    };
   }, [loadBooks, searchMode]);
 
   const handleExternalSearch = async () => {

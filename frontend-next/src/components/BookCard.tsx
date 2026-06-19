@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { memo } from 'react';
 import { BookCover } from './BookCover';
 import { StarRating } from './StarRating';
 import type { BookSummary } from '@/types';
@@ -35,7 +36,7 @@ function CardContent({ book }: BookCardProps) {
   );
 }
 
-export function BookCard({ book }: BookCardProps) {
+export const BookCard = memo(function BookCard({ book }: BookCardProps) {
   if (!book.id) {
     return (
       <div className="group block">
@@ -49,4 +50,4 @@ export function BookCard({ book }: BookCardProps) {
       <CardContent book={book} />
     </Link>
   );
-}
+});

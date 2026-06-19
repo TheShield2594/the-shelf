@@ -29,7 +29,7 @@ def clean_isbn(raw: str) -> str | None:
     if not raw:
         return None
     cleaned = raw.strip()
-    if cleaned.startswith('="') and cleaned.endswith('"'):
+    if cleaned.startswith('="') and cleaned.endswith('""'):
         cleaned = cleaned[2:-1]
     cleaned = cleaned.replace("-", "").replace(" ", "").strip()
     if len(cleaned) == 13 and cleaned.isdigit():
@@ -69,12 +69,42 @@ async def import_goodreads_csv(
 
     reader = csv.DictReader(io.StringIO(text))
 
+    # Pre-collect all rows and unique ISBNs for batch lookup
+    rows = list(reader)
+    all_isbns = set()
+    for row in rows:
+        isbn = clean_isbn(row.get("ISBN", "")) or clean_isbn(row.get("ISBN13", ""))
+        if isbn:
+            all_isbns.add(isbn)
+
+    # Batch lookup: fetch all existing books by ISBN in one query
+    existing_books_map: dict[str, Book] = {}
+    if all_isbns:
+        result = await db.execute(
+            select(Book).where(Book.isbn.in_(list(all_isbns)))
+        )
+        for book in result.scalars().all():
+            if book.isbn:
+                existing_books_map[book.isbn] = book
+
+    # Batch lookup: fetch all existing user_book entries for these books
+    existing_book_ids = [b.id for b in existing_books_map.values()]
+    existing_user_books: set[int] = set()
+    if existing_book_ids:
+        ub_result = await db.execute(
+            select(UserBook.book_id).where(
+                UserBook.user_id == user.id,
+                UserBook.book_id.in_(existing_book_ids),
+            )
+        )
+        existing_user_books = set(ub_result.scalars().all())
+
     imported = 0
     skipped = 0
     errors = 0
     results = []
 
-    for row in reader:
+    for row in rows:
         title = row.get("Title", "").strip()
         if not title:
             skipped += 1
@@ -83,6 +113,8 @@ async def import_goodreads_csv(
 
         row_status = None
         try:
+            # Use savepoint isolation so an IntegrityError on one row
+            # doesn't invalidate the session for remaining rows
             async with db.begin_nested():
                 author = row.get("Author", "").strip()
                 isbn = clean_isbn(row.get("ISBN", "")) or clean_isbn(
@@ -98,13 +130,8 @@ async def import_goodreads_csv(
                 shelf = row.get("Exclusive Shelf", "to-read").strip()
                 status = STATUS_MAP.get(shelf, "want_to_read")
 
-                # Check if book exists by ISBN only
-                book = None
-                if isbn:
-                    result = await db.execute(
-                        select(Book).where(Book.isbn == isbn)
-                    )
-                    book = result.scalar_one_or_none()
+                # Use pre-fetched book from batch lookup
+                book = existing_books_map.get(isbn) if isbn else None
 
                 if not book:
                     cover_url = (
@@ -120,15 +147,11 @@ async def import_goodreads_csv(
                     )
                     db.add(book)
                     await db.flush()
+                    if isbn:
+                        existing_books_map[isbn] = book
 
-                # Check if already in user's library
-                existing = await db.execute(
-                    select(UserBook).where(
-                        UserBook.user_id == user.id,
-                        UserBook.book_id == book.id,
-                    )
-                )
-                if existing.scalar_one_or_none():
+                # Check if already in user's library (using pre-fetched set)
+                if book.id in existing_user_books:
                     row_status = "already_in_library"
                 else:
                     now = datetime.now(timezone.utc)
@@ -142,6 +165,7 @@ async def import_goodreads_csv(
                     )
                     db.add(ub)
                     await db.flush()
+                    existing_user_books.add(book.id)
                     row_status = "imported"
 
             # Savepoint released successfully — update counters
