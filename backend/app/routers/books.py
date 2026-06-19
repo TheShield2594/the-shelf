@@ -1,4 +1,6 @@
 import asyncio
+import datetime
+import re
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func, or_
@@ -137,6 +139,8 @@ async def _fetch_google_books_enrichment(
         "rating_count": info.get("ratingsCount"),
         "categories": info.get("categories", []),
         "buy_link": sale.get("buyLink"),
+        "page_count": info.get("pageCount"),
+        "published_date": info.get("publishedDate"),
     }
 
 
@@ -158,6 +162,26 @@ async def _fetch_openlibrary_author_bio(author_url: str | None) -> str | None:
         return None
     bio = data.get("bio")
     return bio.get("value") if isinstance(bio, dict) else bio
+
+
+def _parse_loose_date(raw: str | None) -> "datetime.date | None":
+    """Parse OpenLibrary/Google Books date strings, which vary widely in format.
+
+    Examples seen: "2018-02-27", "2018-02", "2018", "March 27, 2018", "March 2018".
+    Falls back to Jan 1 of the year if only a year is found.
+    """
+    if not raw:
+        return None
+    raw = raw.strip()
+    for fmt in ("%Y-%m-%d", "%Y-%m", "%B %d, %Y", "%B %Y", "%Y"):
+        try:
+            return datetime.datetime.strptime(raw, fmt).date()
+        except ValueError:
+            continue
+    match = re.search(r"\d{4}", raw)
+    if match:
+        return datetime.date(int(match.group()), 1, 1)
+    return None
 
 
 def _extract_subject_names(subjects) -> list[str]:
@@ -273,7 +297,8 @@ async def lookup_isbn(
         "large", ol.get("cover", {}).get("medium")
     )
     desc = ol.get("notes") if isinstance(ol.get("notes"), str) else None
-    pub_date = None
+    pub_date = _parse_loose_date(ol.get("publish_date"))
+    page_count = ol.get("number_of_pages")
     subjects = _extract_subject_names(ol.get("subjects"))
 
     google = await _fetch_google_books_enrichment(clean_isbn, title, authors)
@@ -281,6 +306,8 @@ async def lookup_isbn(
         authors_raw[0].get("url") if authors_raw else None
     )
     desc = desc or google.get("description")
+    pub_date = pub_date or _parse_loose_date(google.get("published_date"))
+    page_count = page_count or google.get("page_count")
     genre_names = _clean_genre_names(subjects, google.get("categories", []))
 
     if save:
@@ -296,6 +323,7 @@ async def lookup_isbn(
             description=desc,
             cover_url=cover,
             publication_date=pub_date,
+            page_count=page_count,
             external_rating=google.get("rating"),
             external_rating_count=google.get("rating_count"),
             buy_link=google.get("buy_link"),
@@ -319,6 +347,7 @@ async def lookup_isbn(
             "description": desc,
             "cover_url": cover,
             "publication_date": pub_date,
+            "page_count": page_count,
             "genres": genre_names,
             "avg_rating": None,
             "rating_count": 0,
@@ -527,6 +556,8 @@ def _book_to_summary(book: Book, avg_rating, rating_count, content_rating) -> di
         "title": book.title,
         "author": book.author,
         "cover_url": book.cover_url,
+        "publication_date": book.publication_date,
+        "page_count": book.page_count,
         "genres": [{"id": g.id, "name": g.name} for g in book.genres],
         "avg_rating": avg_rating,
         "rating_count": rating_count,
@@ -625,6 +656,7 @@ async def get_book(book_id: int, db: AsyncSession = Depends(get_db)):
         "description": book.description,
         "cover_url": book.cover_url,
         "publication_date": book.publication_date,
+        "page_count": book.page_count,
         "created_at": book.created_at,
         "genres": [{"id": g.id, "name": g.name} for g in book.genres],
         "avg_rating": avg_r,
@@ -840,7 +872,8 @@ async def import_from_open_library(
             "large", ol.get("cover", {}).get("medium")
         )
         desc = ol.get("notes") if isinstance(ol.get("notes"), str) else None
-        pub_date = None
+        pub_date = _parse_loose_date(ol.get("publish_date"))
+        page_count = ol.get("number_of_pages")
         subjects = _extract_subject_names(ol.get("subjects"))
         author_url = authors_raw[0].get("url") if authors_raw else None
     else:
@@ -862,7 +895,8 @@ async def import_from_open_library(
             else None
         )
         desc = None
-        pub_date = None
+        pub_date = _parse_loose_date(str(doc.get("first_publish_year")) if doc.get("first_publish_year") else None)
+        page_count = None
         subjects = doc.get("subject", [])
         author_keys = doc.get("author_key", [])
         author_url = (
@@ -874,6 +908,8 @@ async def import_from_open_library(
     google = await _fetch_google_books_enrichment(clean_isbn, title, authors)
     author_bio = await _fetch_openlibrary_author_bio(author_url)
     desc = desc or google.get("description")
+    pub_date = pub_date or _parse_loose_date(google.get("published_date"))
+    page_count = page_count or google.get("page_count")
     genre_names = _clean_genre_names(subjects, google.get("categories", []))
 
     book = Book(
@@ -884,6 +920,7 @@ async def import_from_open_library(
         description=desc,
         cover_url=cover,
         publication_date=pub_date,
+        page_count=page_count,
         external_rating=google.get("rating"),
         external_rating_count=google.get("rating_count"),
         buy_link=google.get("buy_link"),

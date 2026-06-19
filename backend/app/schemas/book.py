@@ -18,6 +18,7 @@ class BookCreate(BaseModel):
     description: str | None = None
     cover_url: str | None = None
     publication_date: datetime.date | None = None
+    page_count: int | None = None
     genre_ids: list[int] = []
 
 
@@ -28,6 +29,7 @@ class BookUpdate(BaseModel):
     description: str | None = None
     cover_url: str | None = None
     publication_date: datetime.date | None = None
+    page_count: int | None = None
     genre_ids: list[int] | None = None
 
 
@@ -49,6 +51,7 @@ class BookOut(BaseModel):
     description: str | None = None
     cover_url: str | None = None
     publication_date: datetime.date | None = None
+    page_count: int | None = None
     created_at: datetime.datetime
     genres: list[GenreOut] = []
     avg_rating: float | None = None
@@ -68,6 +71,8 @@ class BookSummary(BaseModel):
     author: str
     author_bio: str | None = None
     cover_url: str | None = None
+    publication_date: datetime.date | None = None
+    page_count: int | None = None
     genres: list[GenreOut] = []
     avg_rating: float | None = None
     rating_count: int = 0
