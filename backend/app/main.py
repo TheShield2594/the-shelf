@@ -15,6 +15,7 @@ from .routers import (
     content_ratings,
     multi_dimensional_ratings,
     goodreads,
+    gamification,
 )
 
 
@@ -51,6 +52,7 @@ app.include_router(reviews.router)
 app.include_router(content_ratings.router)
 app.include_router(multi_dimensional_ratings.router)
 app.include_router(goodreads.router)
+app.include_router(gamification.router)
 
 
 @app.get("/api/health")

@@ -6,6 +6,8 @@ from .review import Review
 from .related_book import RelatedBook
 from .content_rating import ContentRating
 from .multi_dimensional_rating import MultiDimensionalRating, BookFingerprint
+from .reading_session import ReadingSession
+from .gamification import UserGamification, Badge, UserBadge
 
 __all__ = [
     "User",
@@ -18,4 +20,8 @@ __all__ = [
     "ContentRating",
     "MultiDimensionalRating",
     "BookFingerprint",
+    "ReadingSession",
+    "UserGamification",
+    "Badge",
+    "UserBadge",
 ]
