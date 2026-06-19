@@ -14,15 +14,18 @@ function CardContent({ book }: BookCardProps) {
   return (
     <div className="card overflow-hidden hover:shadow-lg transition-shadow duration-200">
       <div className="flex justify-center pt-4 px-4">
-        <div className="group-hover:scale-105 transition-transform duration-200">
+        <div className="relative group-hover:scale-105 transition-transform duration-200">
           <BookCover coverUrl={book.cover_url} title={book.title} author={book.author} size="md" />
+          <div className="absolute inset-0 rounded-lg flex items-end justify-center opacity-0 group-hover:opacity-100 backdrop-blur-[2px] bg-gradient-to-t from-black/60 via-black/10 to-transparent transition-opacity duration-200">
+            <span className="pb-3 text-xs font-medium text-white tracking-wide">View details</span>
+          </div>
         </div>
       </div>
       <div className="p-4">
-        <h3 className="font-serif font-semibold text-sm text-stone-900 dark:text-gray-100 line-clamp-2 leading-snug mb-1">
+        <h3 className="font-serif font-semibold text-base text-stone-900 dark:text-gray-100 line-clamp-2 leading-snug mb-1">
           {book.title}
         </h3>
-        <p className="text-xs text-stone-500 dark:text-gray-400 line-clamp-1 mb-2">
+        <p className="font-serif italic text-xs text-stone-500 dark:text-gray-400 line-clamp-1 mb-2">
           {book.author}
         </p>
         {book.avg_rating && book.rating_count > 0 ? (
