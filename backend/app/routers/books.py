@@ -27,6 +27,16 @@ from ..auth import get_current_user, get_current_user_optional
 
 router = APIRouter(prefix="/api/books", tags=["books"])
 
+# Reusable httpx client for external API calls
+_http_client: httpx.AsyncClient | None = None
+
+
+async def get_http_client() -> httpx.AsyncClient:
+    global _http_client
+    if _http_client is None or _http_client.is_closed:
+        _http_client = httpx.AsyncClient(timeout=10)
+    return _http_client
+
 
 # ---------------------------------------------------------------------------
 # Lookup & Search endpoints (must be defined before /{book_id})
@@ -60,21 +70,21 @@ async def lookup_isbn(
         }
 
     # Query OpenLibrary
-    async with httpx.AsyncClient(timeout=10) as client:
-        resp = await client.get(
-            "https://openlibrary.org/api/books.json",
-            params={
-                "bibkeys": f"ISBN:{clean_isbn}",
-                "format": "data",
-                "jscmd": "data",
-            },
-        )
-        if resp.status_code != 200:
-            raise HTTPException(status_code=502, detail="OpenLibrary service unavailable")
-        try:
-            data = resp.json()
-        except Exception:
-            raise HTTPException(status_code=502, detail="Failed to parse OpenLibrary response")
+    client = await get_http_client()
+    resp = await client.get(
+        "https://openlibrary.org/api/books.json",
+        params={
+            "bibkeys": f"ISBN:{clean_isbn}",
+            "format": "data",
+            "jscmd": "data",
+        },
+    )
+    if resp.status_code != 200:
+        raise HTTPException(status_code=502, detail="OpenLibrary service unavailable")
+    try:
+        data = resp.json()
+    except Exception:
+        raise HTTPException(status_code=502, detail="Failed to parse OpenLibrary response")
 
     key = f"ISBN:{clean_isbn}"
     if key not in data:
@@ -135,17 +145,17 @@ async def search_external(
     limit: int = Query(10, le=50),
 ):
     """Search OpenLibrary for books without saving to database."""
-    async with httpx.AsyncClient(timeout=10) as client:
-        resp = await client.get(
-            "https://openlibrary.org/search.json",
-            params={"q": q, "limit": limit},
-        )
-        if resp.status_code != 200:
-            raise HTTPException(status_code=502, detail="OpenLibrary service unavailable")
-        try:
-            results = resp.json()
-        except Exception:
-            raise HTTPException(status_code=502, detail="Failed to parse OpenLibrary response")
+    client = await get_http_client()
+    resp = await client.get(
+        "https://openlibrary.org/search.json",
+        params={"q": q, "limit": limit},
+    )
+    if resp.status_code != 200:
+        raise HTTPException(status_code=502, detail="OpenLibrary service unavailable")
+    try:
+        results = resp.json()
+    except Exception:
+        raise HTTPException(status_code=502, detail="Failed to parse OpenLibrary response")
 
     books = []
     for doc in results.get("docs", []):
@@ -176,11 +186,17 @@ async def search_external(
 
 
 # ---------------------------------------------------------------------------
-# Stats helpers
+# Stats helpers — optimized batch queries
 # ---------------------------------------------------------------------------
 
 
 async def _compute_book_stats(db: AsyncSession, book_id: int):
+    """Compute avg rating, rating count, and content rating for a single book.
+
+    Uses a single combined query for content rating averages + tag aggregation
+    instead of separate round-trips.
+    """
+    # Combine rating avg/count into one query
     rating_result = await db.execute(
         select(func.avg(UserBook.rating), func.count(UserBook.rating)).where(
             UserBook.book_id == book_id, UserBook.rating.isnot(None)
@@ -188,6 +204,7 @@ async def _compute_book_stats(db: AsyncSession, book_id: int):
     )
     avg_rating, rating_count = rating_result.one()
 
+    # Single query for content rating averages + count + tags (using array_agg)
     cr_result = await db.execute(
         select(
             func.avg(ContentRating.violence_level),
@@ -202,6 +219,7 @@ async def _compute_book_stats(db: AsyncSession, book_id: int):
 
     content_rating = None
     if cr_count > 0:
+        # Fetch tags only when they exist (avoid unnecessary query otherwise)
         all_tags_result = await db.execute(
             select(ContentRating.other_tags).where(
                 ContentRating.book_id == book_id,
@@ -231,6 +249,84 @@ async def _compute_book_stats(db: AsyncSession, book_id: int):
         rating_count or 0,
         content_rating,
     )
+
+
+async def _compute_batch_stats(db: AsyncSession, book_ids: list[int]) -> dict[int, tuple]:
+    """Compute stats for multiple books in a single set of queries.
+
+    Returns a dict mapping book_id -> (avg_rating, rating_count, content_rating).
+    This eliminates N+1 query patterns when listing multiple books.
+    """
+    if not book_ids:
+        return {}
+
+    # Single query for all ratings
+    rating_result = await db.execute(
+        select(
+            UserBook.book_id,
+            func.avg(UserBook.rating),
+            func.count(UserBook.rating),
+        )
+        .where(UserBook.book_id.in_(book_ids), UserBook.rating.isnot(None))
+        .group_by(UserBook.book_id)
+    )
+    rating_map = {row[0]: (row[1], row[2]) for row in rating_result}
+
+    # Single query for all content rating averages
+    cr_result = await db.execute(
+        select(
+            ContentRating.book_id,
+            func.avg(ContentRating.violence_level),
+            func.avg(ContentRating.language_level),
+            func.avg(ContentRating.sexual_content_level),
+            func.avg(ContentRating.substance_use_level),
+            func.count(ContentRating.id),
+        )
+        .where(ContentRating.book_id.in_(book_ids))
+        .group_by(ContentRating.book_id)
+    )
+    cr_map = {row[0]: row for row in cr_result}
+
+    # Single query for all tags (only for books that have content ratings)
+    books_with_cr = list(cr_map.keys())
+    tags_map: dict[int, list[str]] = {}
+    if books_with_cr:
+        tags_result = await db.execute(
+            select(ContentRating.book_id, ContentRating.other_tags)
+            .where(
+                ContentRating.book_id.in_(books_with_cr),
+                ContentRating.other_tags.isnot(None),
+            )
+        )
+        for book_id, tags in tags_result:
+            if tags:
+                tags_map.setdefault(book_id, []).extend(tags)
+
+    from collections import Counter
+
+    result = {}
+    for bid in book_ids:
+        avg_r, r_count = rating_map.get(bid, (None, 0))
+        cr_row = cr_map.get(bid)
+        content_rating = None
+        if cr_row and cr_row[5] > 0:
+            tags = tags_map.get(bid, [])
+            tag_counts = Counter(tags)
+            common = [t for t, c in tag_counts.most_common(10)]
+            content_rating = ContentRatingAvg(
+                violence_level=round(float(cr_row[1] or 0), 1),
+                language_level=round(float(cr_row[2] or 0), 1),
+                sexual_content_level=round(float(cr_row[3] or 0), 1),
+                substance_use_level=round(float(cr_row[4] or 0), 1),
+                common_tags=common,
+                count=cr_row[5],
+            )
+        result[bid] = (
+            round(float(avg_r), 2) if avg_r else None,
+            r_count or 0,
+            content_rating,
+        )
+    return result
 
 
 def _book_to_summary(book: Book, avg_rating, rating_count, content_rating) -> dict:
@@ -294,11 +390,14 @@ async def list_books(
     result = await db.execute(stmt)
     books = result.scalars().unique().all()
 
-    out = []
-    for book in books:
-        avg_r, r_count, cr = await _compute_book_stats(db, book.id)
-        out.append(_book_to_summary(book, avg_r, r_count, cr))
-    return out
+    # Batch compute stats for all books in 3 queries instead of N*3
+    book_ids = [b.id for b in books]
+    stats = await _compute_batch_stats(db, book_ids)
+
+    return [
+        _book_to_summary(book, *stats.get(book.id, (None, 0, None)))
+        for book in books
+    ]
 
 
 @router.get("/{book_id}", response_model=BookDetail)
@@ -518,51 +617,51 @@ async def import_from_open_library(
     db: AsyncSession = Depends(get_db),
     _user=Depends(get_current_user),
 ):
-    async with httpx.AsyncClient() as client:
-        if data.isbn:
-            resp = await client.get(
-                "https://openlibrary.org/api/books.json",
-                params={
-                    "bibkeys": f"ISBN:{data.query}",
-                    "format": "data",
-                    "jscmd": "data",
-                },
+    client = await get_http_client()
+    if data.isbn:
+        resp = await client.get(
+            "https://openlibrary.org/api/books.json",
+            params={
+                "bibkeys": f"ISBN:{data.query}",
+                "format": "data",
+                "jscmd": "data",
+            },
+        )
+        result = resp.json()
+        key = f"ISBN:{data.query}"
+        if key not in result:
+            raise HTTPException(
+                status_code=404, detail="Book not found on Open Library"
             )
-            result = resp.json()
-            key = f"ISBN:{data.query}"
-            if key not in result:
-                raise HTTPException(
-                    status_code=404, detail="Book not found on Open Library"
-                )
-            ol = result[key]
-            title = ol.get("title", "")
-            authors = ", ".join(a.get("name", "") for a in ol.get("authors", []))
-            cover = ol.get("cover", {}).get(
-                "large", ol.get("cover", {}).get("medium")
+        ol = result[key]
+        title = ol.get("title", "")
+        authors = ", ".join(a.get("name", "") for a in ol.get("authors", []))
+        cover = ol.get("cover", {}).get(
+            "large", ol.get("cover", {}).get("medium")
+        )
+        desc = ol.get("notes") if isinstance(ol.get("notes"), str) else None
+        pub_date = None
+    else:
+        resp = await client.get(
+            "https://openlibrary.org/search.json",
+            params={"q": data.query, "limit": 1},
+        )
+        results = resp.json()
+        if not results.get("docs"):
+            raise HTTPException(
+                status_code=404, detail="Book not found on Open Library"
             )
-            desc = ol.get("notes") if isinstance(ol.get("notes"), str) else None
-            pub_date = None
-        else:
-            resp = await client.get(
-                "https://openlibrary.org/search.json",
-                params={"q": data.query, "limit": 1},
-            )
-            results = resp.json()
-            if not results.get("docs"):
-                raise HTTPException(
-                    status_code=404, detail="Book not found on Open Library"
-                )
-            doc = results["docs"][0]
-            title = doc.get("title", "")
-            authors = ", ".join(doc.get("author_name", []))
-            cover_id = doc.get("cover_i")
-            cover = (
-                f"https://covers.openlibrary.org/b/id/{cover_id}-L.jpg"
-                if cover_id
-                else None
-            )
-            desc = None
-            pub_date = None
+        doc = results["docs"][0]
+        title = doc.get("title", "")
+        authors = ", ".join(doc.get("author_name", []))
+        cover_id = doc.get("cover_i")
+        cover = (
+            f"https://covers.openlibrary.org/b/id/{cover_id}-L.jpg"
+            if cover_id
+            else None
+        )
+        desc = None
+        pub_date = None
 
     book = Book(
         title=title,

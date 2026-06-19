@@ -147,7 +147,16 @@ async def get_radar_chart_data(
         if user_rating:
             return RadarChartData.from_rating(user_rating)
 
-    fingerprint = await get_book_fingerprint(book_id, db)
+    # Query fingerprint directly instead of calling get_book_fingerprint
+    # (avoids an extra Book existence check + redundant query)
+    fp_result = await db.execute(
+        select(BookFingerprint).where(BookFingerprint.book_id == book_id)
+    )
+    fingerprint = fp_result.scalar_one_or_none()
+
+    if not fingerprint:
+        fingerprint = BookFingerprint(book_id=book_id, total_ratings=0)
+
     return RadarChartData.from_rating(fingerprint)
 
 

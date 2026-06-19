@@ -19,9 +19,13 @@ from .routers import (
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Only create tables on first run (when no tables exist).
+    # This avoids the overhead of running create_all on every startup.
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield
+    # Dispose of the connection pool cleanly on shutdown
+    await engine.dispose()
 
 
 app = FastAPI(title="The Shelf", version="1.0.0", lifespan=lifespan)
