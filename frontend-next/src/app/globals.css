@@ -32,6 +32,29 @@
   .input {
     @apply w-full bg-white dark:bg-gray-900 border border-stone-300 dark:border-gray-700 rounded-lg px-4 py-2.5 text-stone-900 dark:text-gray-100 placeholder-stone-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-shelf-500 focus:border-transparent transition-all duration-200;
   }
+
+  /* Neumorphic search input (inspired by Uiverse.io by ercnersoy) */
+  .input-search {
+    @apply w-full border-none rounded-2xl px-4 py-3 text-stone-900 dark:text-gray-100 placeholder-stone-400 dark:placeholder-gray-500 transition-all duration-300;
+    background: #e8e8e8;
+    box-shadow: 8px 8px 16px #c5c5c5, -8px -8px 16px #ffffff;
+  }
+
+  .input-search:focus {
+    outline: none;
+    background: #e8e8e8;
+    box-shadow: inset 6px 6px 12px #c5c5c5, inset -6px -6px 12px #ffffff;
+  }
+
+  .dark .input-search {
+    background: #1f2430;
+    box-shadow: 8px 8px 16px #141821, -8px -8px 16px #2a3142;
+  }
+
+  .dark .input-search:focus {
+    background: #1f2430;
+    box-shadow: inset 6px 6px 12px #141821, inset -6px -6px 12px #2a3142;
+  }
 }
 
 @layer utilities {

@@ -8,6 +8,7 @@ import { BookCover } from '@/components/BookCover';
 import { StarRating } from '@/components/StarRating';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { EmptyState } from '@/components/EmptyState';
+import { Tooltip } from '@/components/Tooltip';
 import type { UserBook } from '@/types';
 
 const STATUS_TABS = [
@@ -82,7 +83,10 @@ export default function LibraryPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <h1 className="text-2xl font-serif font-bold text-stone-900 dark:text-gray-100 mb-6">My Library</h1>
+      <h1 className="text-2xl font-serif font-bold text-stone-900 dark:text-gray-100 mb-6 flex items-center gap-2">
+        My Library
+        <Tooltip text="This is your shelf — every book you've added lives here. Use the Remove button on a book if it was added by accident." />
+      </h1>
 
       {/* Status tabs */}
       <div className="flex gap-2 mb-6 overflow-x-auto pb-2">

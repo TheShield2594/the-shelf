@@ -365,6 +365,28 @@ async def create_book(
     db: AsyncSession = Depends(get_db),
     _user=Depends(get_current_user),
 ):
+    # Avoid creating duplicate catalog entries for a book that already exists,
+    # which would let the same title be added to a shelf more than once under
+    # different book ids.
+    existing_stmt = select(Book).options(selectinload(Book.genres))
+    if data.isbn:
+        existing_stmt = existing_stmt.where(Book.isbn == data.isbn)
+    else:
+        existing_stmt = existing_stmt.where(
+            func.lower(Book.title) == data.title.lower(),
+            func.lower(Book.author) == data.author.lower(),
+        )
+    existing = (await db.execute(existing_stmt)).scalars().first()
+    if existing:
+        avg_r, r_count, cr = await _compute_book_stats(db, existing.id)
+        return {
+            **existing.__dict__,
+            "genres": [{"id": g.id, "name": g.name} for g in existing.genres],
+            "avg_rating": avg_r,
+            "rating_count": r_count,
+            "content_rating": cr,
+        }
+
     book = Book(
         title=data.title,
         author=data.author,
