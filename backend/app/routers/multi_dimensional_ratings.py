@@ -135,7 +135,17 @@ async def get_radar_chart_data(
     db: AsyncSession = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user),
 ):
-    """Get radar chart data for a book."""
+    """Get radar chart data for a book.
+
+    Returns 404 if the book does not exist, maintaining consistency
+    with the get_book_fingerprint endpoint.
+    """
+    # Restore Book existence check for API contract consistency
+    book_result = await db.execute(select(Book).where(Book.id == book_id))
+    book = book_result.scalar_one_or_none()
+    if not book:
+        raise HTTPException(status_code=404, detail="Book not found")
+
     if current_user:
         result = await db.execute(
             select(MultiDimensionalRating).where(
@@ -147,8 +157,7 @@ async def get_radar_chart_data(
         if user_rating:
             return RadarChartData.from_rating(user_rating)
 
-    # Query fingerprint directly instead of calling get_book_fingerprint
-    # (avoids an extra Book existence check + redundant query)
+    # Query fingerprint directly (Book existence already verified above)
     fp_result = await db.execute(
         select(BookFingerprint).where(BookFingerprint.book_id == book_id)
     )
