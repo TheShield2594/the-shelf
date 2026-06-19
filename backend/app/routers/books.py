@@ -2,6 +2,7 @@ import asyncio
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func, or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -179,6 +180,8 @@ def _clean_genre_names(*sources: list[str], limit: int = 8) -> list[str]:
     cleaned = []
     for source in sources:
         for raw in source or []:
+            if not isinstance(raw, str):
+                continue
             for part in raw.split(" / "):
                 name = part.strip()
                 key = name.lower()
@@ -192,15 +195,25 @@ def _clean_genre_names(*sources: list[str], limit: int = 8) -> list[str]:
 
 
 async def _get_or_create_genres(db: AsyncSession, names: list[str]) -> list[Genre]:
-    """Match genre names to existing Genre rows case-insensitively, creating new ones."""
+    """Match genre names to existing Genre rows case-insensitively, creating new ones.
+
+    Inserts happen inside a savepoint so a unique-constraint race against a
+    concurrent request (both missing the SELECT, both inserting) falls back
+    to re-fetching the row instead of raising.
+    """
     genres = []
     for name in names:
         result = await db.execute(select(Genre).where(Genre.name.ilike(name)))
         genre = result.scalar_one_or_none()
         if not genre:
-            genre = Genre(name=name)
-            db.add(genre)
-            await db.flush()
+            try:
+                async with db.begin_nested():
+                    genre = Genre(name=name)
+                    db.add(genre)
+                    await db.flush()
+            except IntegrityError:
+                result = await db.execute(select(Genre).where(Genre.name.ilike(name)))
+                genre = result.scalar_one_or_none()
         genres.append(genre)
     return genres
 
@@ -803,16 +816,18 @@ async def import_from_open_library(
     db: AsyncSession = Depends(get_db),
     _user=Depends(get_current_user),
 ):
+    clean_isbn = data.query.replace("-", "").replace(" ", "") if data.isbn else None
+
     if data.isbn:
         result = await _openlibrary_get(
             "https://openlibrary.org/api/books.json",
             params={
-                "bibkeys": f"ISBN:{data.query}",
+                "bibkeys": f"ISBN:{clean_isbn}",
                 "format": "data",
                 "jscmd": "data",
             },
         )
-        key = f"ISBN:{data.query}"
+        key = f"ISBN:{clean_isbn}"
         if key not in result:
             raise HTTPException(
                 status_code=404, detail="Book not found on Open Library"
@@ -856,9 +871,7 @@ async def import_from_open_library(
             else None
         )
 
-    google = await _fetch_google_books_enrichment(
-        data.query if data.isbn else None, title, authors
-    )
+    google = await _fetch_google_books_enrichment(clean_isbn, title, authors)
     author_bio = await _fetch_openlibrary_author_bio(author_url)
     desc = desc or google.get("description")
     genre_names = _clean_genre_names(subjects, google.get("categories", []))
@@ -867,7 +880,7 @@ async def import_from_open_library(
         title=title,
         author=authors,
         author_bio=author_bio,
-        isbn=data.query if data.isbn else None,
+        isbn=clean_isbn,
         description=desc,
         cover_url=cover,
         publication_date=pub_date,

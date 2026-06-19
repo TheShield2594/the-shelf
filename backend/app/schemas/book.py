@@ -66,6 +66,7 @@ class BookSummary(BaseModel):
     id: int
     title: str
     author: str
+    author_bio: str | None = None
     cover_url: str | None = None
     genres: list[GenreOut] = []
     avg_rating: float | None = None
