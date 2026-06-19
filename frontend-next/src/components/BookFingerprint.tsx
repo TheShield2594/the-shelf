@@ -67,13 +67,6 @@ export function BookFingerprint({ bookId, initialFingerprint }: BookFingerprintP
     );
   }
 
-  // Prepare chart data
-  const chartData = RATING_DIMENSIONS.map((dim) => ({
-    dimension: dim.shortLabel,
-    value: (fingerprint as any)[`avg_${dim.key}`] || 0,
-    fullMark: 5,
-  }));
-
   return (
     <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
       <div className="flex items-center justify-between mb-6">
@@ -90,7 +83,7 @@ export function BookFingerprint({ bookId, initialFingerprint }: BookFingerprintP
       </div>
 
       {/* Radar Chart */}
-      <RadarChart data={chartData} className="mb-6" />
+      <RadarChart bookId={bookId} />
 
       {/* Overall Star Equivalent */}
       {fingerprint.star_equivalent != null && (
