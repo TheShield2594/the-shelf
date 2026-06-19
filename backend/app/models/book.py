@@ -1,5 +1,5 @@
 import datetime
-from sqlalchemy import String, Text, Date, DateTime, Table, Column, ForeignKey, func
+from sqlalchemy import String, Text, Date, DateTime, Float, Integer, Table, Column, ForeignKey, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..database import Base
@@ -22,6 +22,10 @@ class Book(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     cover_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     publication_date: Mapped[datetime.date | None] = mapped_column(Date, nullable=True)
+    author_bio: Mapped[str | None] = mapped_column(Text, nullable=True)
+    external_rating: Mapped[float | None] = mapped_column(Float, nullable=True)
+    external_rating_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    buy_link: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
