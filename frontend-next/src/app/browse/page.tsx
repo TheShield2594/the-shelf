@@ -172,7 +172,7 @@ export default function BrowsePage() {
           {displayBooks.map((book, idx) => {
             const alreadyImported = searchMode === 'external' && importedKeys.has(bookKey(book));
             return (
-              <div key={`${book.id || book.isbn}-${idx}`} className="relative">
+              <div key={`${book.id || book.isbn}-${idx}`} className="relative group/tile">
                 {searchMode === 'external' && !book.id ? (
                   <button onClick={() => setPreviewBook(book)} className="group block w-full text-left">
                     <BookCard book={book} />
@@ -192,7 +192,7 @@ export default function BrowsePage() {
                 {searchMode === 'shelf' && book.id && (
                   <button
                     onClick={() => handleRemoveBook(book)}
-                    className="absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white rounded-lg px-2 py-1 text-xs shadow-md transition-colors"
+                    className="absolute top-2 right-2 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900 rounded-lg px-2 py-1 text-xs shadow-md transition-all opacity-0 group-hover/tile:opacity-100"
                   >
                     Remove
                   </button>

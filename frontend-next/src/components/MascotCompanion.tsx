@@ -23,13 +23,13 @@ interface MascotCompanionProps {
 
 export function MascotCompanion({ mood, streak }: MascotCompanionProps) {
   return (
-    <div className="flex items-center gap-4 card p-4 bg-shelf-50 dark:bg-shelf-950/30">
-      <div className="text-5xl" aria-hidden="true">{MOOD_EMOJI[mood]}</div>
+    <div className="flex items-center gap-4">
+      <div className="text-5xl drop-shadow-sm" aria-hidden="true">{MOOD_EMOJI[mood]}</div>
       <div>
-        <p className="font-serif font-semibold text-stone-900 dark:text-gray-100">
+        <p className="font-serif font-semibold text-lg text-white">
           {streak > 0 ? `${streak}-day streak` : 'No active streak'}
         </p>
-        <p className="text-sm text-stone-600 dark:text-gray-400">{MOOD_MESSAGE[mood]}</p>
+        <p className="text-sm text-white/80">{MOOD_MESSAGE[mood]}</p>
       </div>
     </div>
   );
