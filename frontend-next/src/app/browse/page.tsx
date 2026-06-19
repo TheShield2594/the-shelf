@@ -109,7 +109,7 @@ export default function BrowsePage() {
         </div>
         {searchMode === 'external' && (
           <button onClick={handleExternalSearch} className="btn-primary whitespace-nowrap">Search</button>
-        )
+        )}
       </div>
 
       {/* Mode toggle */}
@@ -169,10 +169,11 @@ export default function BrowsePage() {
             );
           })}
         </div>
-      }
+      )}
 
       {previewBook && (
         <BookDetailModal book={previewBook} onClose={() => setPreviewBook(null)} />
       )}
     </div>
   );
+}
