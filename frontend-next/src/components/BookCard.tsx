@@ -8,21 +8,23 @@ import type { BookSummary } from '@/types';
 
 interface BookCardProps {
   book: BookSummary;
+  featured?: boolean;
 }
 
-function CardContent({ book }: BookCardProps) {
+function CardContent({ book, featured }: BookCardProps) {
+  const coverSize = featured ? 'lg' : 'md';
   return (
-    <div className="card overflow-hidden hover:shadow-lg transition-shadow duration-200">
+    <div className="card overflow-hidden hover:shadow-lg transition-shadow duration-200 h-full">
       <div className="flex justify-center pt-4 px-4">
         <div className="relative group-hover:scale-105 transition-transform duration-200">
-          <BookCover coverUrl={book.cover_url} title={book.title} author={book.author} size="md" />
+          <BookCover coverUrl={book.cover_url} title={book.title} author={book.author} size={coverSize} />
           <div className="absolute inset-0 rounded-lg flex items-end justify-center opacity-0 group-hover:opacity-100 backdrop-blur-[2px] bg-gradient-to-t from-black/60 via-black/10 to-transparent transition-opacity duration-200">
             <span className="pb-3 text-xs font-medium text-white tracking-wide">View details</span>
           </div>
         </div>
       </div>
       <div className="p-4">
-        <h3 className="font-serif font-semibold text-base text-stone-900 dark:text-gray-100 line-clamp-2 leading-snug mb-1">
+        <h3 className={`font-serif font-semibold text-stone-900 dark:text-gray-100 line-clamp-2 leading-snug mb-1 ${featured ? 'text-lg' : 'text-base'}`}>
           {book.title}
         </h3>
         <p className="font-serif italic text-xs text-stone-500 dark:text-gray-400 line-clamp-1 mb-2">
@@ -39,18 +41,18 @@ function CardContent({ book }: BookCardProps) {
   );
 }
 
-export const BookCard = memo(function BookCard({ book }: BookCardProps) {
+export const BookCard = memo(function BookCard({ book, featured }: BookCardProps) {
   if (!book.id) {
     return (
-      <div className="group block">
-        <CardContent book={book} />
+      <div className="group block h-full">
+        <CardContent book={book} featured={featured} />
       </div>
     );
   }
 
   return (
-    <Link href={`/books/${book.id}`} className="group block">
-      <CardContent book={book} />
+    <Link href={`/books/${book.id}`} className="group block h-full">
+      <CardContent book={book} featured={featured} />
     </Link>
   );
 });

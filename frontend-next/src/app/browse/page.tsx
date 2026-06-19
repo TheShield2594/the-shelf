@@ -168,17 +168,20 @@ export default function BrowsePage() {
           description={searchMode === 'external' ? 'Try a different search term.' : 'Add books by scanning a barcode or importing from Goodreads.'}
         />
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 items-start">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 items-start [grid-auto-flow:dense]">
           {displayBooks.map((book, idx) => {
             const alreadyImported = searchMode === 'external' && importedKeys.has(bookKey(book));
+            // Stagger the grid: every 6th tile gets a featured (larger) treatment
+            // if it's a standout rating, so the shelf doesn't read as one flat grid.
+            const featured = idx % 6 === 2 && (book.avg_rating ?? 0) >= 4;
             return (
-              <div key={`${book.id || book.isbn}-${idx}`} className="relative group/tile">
+              <div key={`${book.id || book.isbn}-${idx}`} className={`relative group/tile ${featured ? 'col-span-2 row-span-2' : ''}`}>
                 {searchMode === 'external' && !book.id ? (
-                  <button onClick={() => setPreviewBook(book)} className="group block w-full text-left">
-                    <BookCard book={book} />
+                  <button onClick={() => setPreviewBook(book)} className="group block w-full h-full text-left">
+                    <BookCard book={book} featured={featured} />
                   </button>
                 ) : (
-                  <BookCard book={book} />
+                  <BookCard book={book} featured={featured} />
                 )}
                 {searchMode === 'external' && !book.id && (
                   <button
