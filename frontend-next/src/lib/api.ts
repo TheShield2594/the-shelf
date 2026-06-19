@@ -9,7 +9,6 @@ import type {
   User,
   UserProfile,
   UserBook,
-  AuthTokens,
   APIError,
   GoodreadsImportResult,
   ISBNDetailLookupResult,
@@ -23,14 +22,10 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
 class APIClient {
   private baseURL: string;
-  private token: string | null = null;
   private cache: Map<string, { data: unknown; expiry: number }> = new Map();
 
   constructor(baseURL: string) {
     this.baseURL = baseURL;
-    if (typeof window !== 'undefined') {
-      this.token = localStorage.getItem('auth_token');
-    }
   }
 
   private getCached<T>(key: string, maxAge: number): T | null {
@@ -65,11 +60,7 @@ class APIClient {
       ...(options.headers as Record<string, string>),
     };
 
-    if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`;
-    }
-
-    const response = await fetch(url, { ...options, headers });
+    const response = await fetch(url, { ...options, headers, credentials: 'include' });
 
     if (!response.ok) {
       const error: APIError = await response.json().catch(() => ({
@@ -88,34 +79,30 @@ class APIClient {
   }
 
   // Auth
-  setToken(token: string) {
-    this.token = token;
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('auth_token', token);
-    }
-  }
-
-  clearToken() {
-    this.token = null;
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('auth_token');
-    }
+  clearLocalState() {
     this.invalidateCache();
   }
 
-  async login(username: string, password: string): Promise<AuthTokens> {
+  async login(username: string, password: string): Promise<User> {
     const response = await fetch(`${this.baseURL}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ username, password }),
     });
     if (!response.ok) {
       const err: APIError = await response.json().catch(() => ({ detail: 'Login failed' }));
       throw new Error(err.detail);
     }
-    const tokens: AuthTokens = await response.json();
-    this.setToken(tokens.access_token);
-    return tokens;
+    return response.json();
+  }
+
+  async logout(): Promise<void> {
+    await fetch(`${this.baseURL}/api/auth/logout`, {
+      method: 'POST',
+      credentials: 'include',
+    }).catch(() => {});
+    this.clearLocalState();
   }
 
   async register(username: string, email: string, password: string): Promise<User> {
@@ -173,11 +160,11 @@ class APIClient {
     return books;
   }
 
-  async getBook(id: number): Promise<Book> {
+  async getBook(id: number, signal?: AbortSignal): Promise<Book> {
     const cacheKey = `book:${id}`;
     const cached = this.getCached<Book>(cacheKey, 15_000);
     if (cached) return cached;
-    const book = await this.request<Book>(`/api/books/${id}`);
+    const book = await this.request<Book>(`/api/books/${id}`, { signal });
     this.setCached(cacheKey, book, 15_000);
     return book;
   }
@@ -202,12 +189,12 @@ class APIClient {
   }
 
   // Library
-  async getLibrary(status?: string): Promise<UserBook[]> {
+  async getLibrary(status?: string, signal?: AbortSignal): Promise<UserBook[]> {
     const query = status ? `?status=${status}` : '';
     const cacheKey = `library${query}`;
     const cached = this.getCached<UserBook[]>(cacheKey, 5_000);
     if (cached) return cached;
-    const books = await this.request<UserBook[]>(`/api/library${query}`);
+    const books = await this.request<UserBook[]>(`/api/library${query}`, { signal });
     this.setCached(cacheKey, books, 5_000);
     return books;
   }
@@ -250,14 +237,9 @@ class APIClient {
     const formData = new FormData();
     formData.append('file', file);
 
-    const headers: HeadersInit = {};
-    if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`;
-    }
-
     const response = await fetch(`${this.baseURL}/api/goodreads/import`, {
       method: 'POST',
-      headers,
+      credentials: 'include',
       body: formData,
     });
 

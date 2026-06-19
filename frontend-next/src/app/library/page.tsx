@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { useAuth } from '@/components/AuthProvider';
+import { useToast } from '@/components/ToastProvider';
 import { BookCover } from '@/components/BookCover';
 import { StarRating } from '@/components/StarRating';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
@@ -22,9 +23,11 @@ const STATUS_TABS = [
 export default function LibraryPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
+  const { showToast } = useToast();
   const [books, setBooks] = useState<UserBook[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('');
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (authLoading) return;
@@ -33,17 +36,22 @@ export default function LibraryPage() {
       return;
     }
     loadBooks();
+    return () => abortControllerRef.current?.abort();
   }, [user, authLoading, activeTab]);
 
   const loadBooks = async () => {
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setLoading(true);
     try {
-      const results = await api.getLibrary(activeTab || undefined);
-      setBooks(results);
+      const results = await api.getLibrary(activeTab || undefined, controller.signal);
+      if (!controller.signal.aborted) setBooks(results);
     } catch {
-      setBooks([]);
+      if (!controller.signal.aborted) setBooks([]);
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) setLoading(false);
     }
   };
 
@@ -52,7 +60,7 @@ export default function LibraryPage() {
       await api.updateLibraryEntry(bookId, { status });
       loadBooks();
     } catch (err: any) {
-      alert(err.message);
+      showToast(err.message);
     }
   };
 
@@ -65,7 +73,7 @@ export default function LibraryPage() {
         )
       );
     } catch (err: any) {
-      alert(err.message);
+      showToast(err.message);
     }
   };
 
@@ -75,7 +83,7 @@ export default function LibraryPage() {
       await api.removeFromLibrary(bookId);
       loadBooks();
     } catch (err: any) {
-      alert(err.message);
+      showToast(err.message);
     }
   };
 

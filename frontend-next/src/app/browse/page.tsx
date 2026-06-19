@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '@/lib/api';
+import { useToast } from '@/components/ToastProvider';
 import { BookCard } from '@/components/BookCard';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { EmptyState } from '@/components/EmptyState';
@@ -10,6 +11,7 @@ import { Tooltip } from '@/components/Tooltip';
 import type { BookSummary } from '@/types';
 
 export default function BrowsePage() {
+  const { showToast } = useToast();
   const [books, setBooks] = useState<BookSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
@@ -88,7 +90,7 @@ export default function BrowsePage() {
       setBooks((prev) => [created, ...prev]);
       setImportedKeys((prev) => new Set(prev).add(bookKey(book)));
     } catch (err: any) {
-      alert(err.message || 'Failed to import book');
+      showToast(err.message || 'Failed to import book');
     } finally {
       setImporting(null);
     }
@@ -101,7 +103,7 @@ export default function BrowsePage() {
       await api.deleteBook(book.id);
       setBooks((prev) => prev.filter((b) => b.id !== book.id));
     } catch (err: any) {
-      alert(err.message || 'Failed to remove book');
+      showToast(err.message || 'Failed to remove book');
     }
   };
 

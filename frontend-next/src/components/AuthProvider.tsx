@@ -27,38 +27,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-    if (token) {
-      api.getCurrentUser()
-        .then(setUser)
-        .catch((err: any) => {
-          // Only clear auth state on 401 (actual auth failure), not transient errors
-          if (err?.status === 401) {
-            localStorage.removeItem('auth_token');
-            api.clearToken();
-          }
-        })
-        .finally(() => setLoading(false));
-    } else {
-      setLoading(false);
-    }
+    // The auth token lives in an httpOnly cookie, so we always probe the
+    // server rather than gating on a client-readable flag.
+    api.getCurrentUser()
+      .then(setUser)
+      .catch(() => {
+        // Any failure (401, network blip, etc.) just means "not logged in"
+        // for rendering purposes — there's no client-side token to clear.
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   const login = useCallback(async (username: string, password: string) => {
-    await api.login(username, password);
-    const u = await api.getCurrentUser();
+    const u = await api.login(username, password);
     setUser(u);
   }, []);
 
   const register = useCallback(async (username: string, email: string, password: string) => {
     await api.register(username, email, password);
-    await api.login(username, password);
-    const u = await api.getCurrentUser();
+    const u = await api.login(username, password);
     setUser(u);
   }, []);
 
   const logout = useCallback(() => {
-    api.clearToken();
+    api.logout();
     setUser(null);
   }, []);
 

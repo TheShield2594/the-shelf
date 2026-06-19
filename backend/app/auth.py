@@ -1,8 +1,8 @@
 from datetime import datetime, timedelta, timezone
 
-from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError, jwt
+from fastapi import Depends, HTTPException, Request, Response, status
+import jwt
+from jwt import PyJWTError as JWTError
 from passlib.context import CryptContext
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,8 +12,8 @@ from .database import get_db
 from .models.user import User
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
-oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
+
+COOKIE_NAME = "access_token"
 
 
 def hash_password(password: str) -> str:
@@ -31,18 +31,40 @@ def create_access_token(data: dict) -> str:
     return jwt.encode(to_encode, settings.secret_key, algorithm=settings.algorithm)
 
 
+def set_auth_cookie(response: Response, token: str) -> None:
+    response.set_cookie(
+        key=COOKIE_NAME,
+        value=token,
+        httponly=True,
+        secure=settings.cookie_secure,
+        samesite="lax",
+        max_age=settings.access_token_expire_minutes * 60,
+        path="/",
+    )
+
+
+def clear_auth_cookie(response: Response) -> None:
+    response.delete_cookie(key=COOKIE_NAME, path="/")
+
+
+def _decode_token(token: str) -> str | None:
+    payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
+    return payload.get("sub")
+
+
 async def get_current_user(
-    token: str = Depends(oauth2_scheme),
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> User:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Invalid authentication credentials",
-        headers={"WWW-Authenticate": "Bearer"},
     )
+    token = request.cookies.get(COOKIE_NAME)
+    if not token:
+        raise credentials_exception
     try:
-        payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
-        user_id: int | None = payload.get("sub")
+        user_id = _decode_token(token)
         if user_id is None:
             raise credentials_exception
     except JWTError:
@@ -56,14 +78,14 @@ async def get_current_user(
 
 
 async def get_current_user_optional(
-    token: str = Depends(oauth2_scheme_optional),
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> User | None:
+    token = request.cookies.get(COOKIE_NAME)
     if not token:
         return None
     try:
-        payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
-        user_id = payload.get("sub")
+        user_id = _decode_token(token)
         if user_id is None:
             return None
         result = await db.execute(select(User).where(User.id == int(user_id)))
