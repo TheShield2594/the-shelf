@@ -168,17 +168,19 @@ export default function BrowsePage() {
           description={searchMode === 'external' ? 'Try a different search term.' : 'Add books by scanning a barcode or importing from Goodreads.'}
         />
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 items-start">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 items-stretch">
           {displayBooks.map((book, idx) => {
             const alreadyImported = searchMode === 'external' && importedKeys.has(bookKey(book));
             return (
-              <div key={`${book.id || book.isbn}-${idx}`} className="relative">
+              <div key={`${book.id || book.isbn}-${idx}`} className="relative h-full">
                 {searchMode === 'external' && !book.id ? (
-                  <button onClick={() => setPreviewBook(book)} className="group block w-full text-left">
+                  <button onClick={() => setPreviewBook(book)} className="group block w-full h-full text-left">
                     <BookCard book={book} />
                   </button>
                 ) : (
-                  <BookCard book={book} />
+                  <div className="h-full">
+                    <BookCard book={book} />
+                  </div>
                 )}
                 {searchMode === 'external' && !book.id && (
                   <button

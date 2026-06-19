@@ -14,12 +14,20 @@ from ..models.user import User
 from ..models.book import Book
 from ..models.user_book import UserBook
 from ..auth import get_current_user
-from .books import _openlibrary_get
+from .books import (
+    _openlibrary_get,
+    _fetch_google_books_enrichment,
+    _fetch_openlibrary_author_bio,
+    _clean_genre_names,
+    _get_or_create_genres,
+    _parse_loose_date,
+)
 
 router = APIRouter(prefix="/api/goodreads", tags=["goodreads"])
 
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 SEARCH_CONCURRENCY = 5  # cap concurrent OpenLibrary lookups during import
+ENRICH_CONCURRENCY = 5  # cap concurrent Google Books enrichment calls during import
 
 STATUS_MAP = {
     "read": "finished",
@@ -70,7 +78,56 @@ async def _search_match(title: str, author: str, semaphore: asyncio.Semaphore) -
             break
     cover_id = doc.get("cover_i")
     cover_url = f"https://covers.openlibrary.org/b/id/{cover_id}-M.jpg" if cover_id else None
-    return {"isbn": matched_isbn, "cover_url": cover_url}
+    author_keys = doc.get("author_key", [])
+    author_url = (
+        f"https://openlibrary.org/authors/{author_keys[0]}" if author_keys else None
+    )
+    return {
+        "isbn": matched_isbn,
+        "cover_url": cover_url,
+        "subjects": doc.get("subject", []),
+        "author_url": author_url,
+    }
+
+
+def _csv_page_count(row: dict) -> int | None:
+    raw = (row.get("Number of Pages") or "").strip()
+    return int(raw) if raw.isdigit() else None
+
+
+def _csv_publication_date(row: dict):
+    raw = (row.get("Original Publication Year") or row.get("Year Published") or "").strip()
+    return _parse_loose_date(raw) if raw else None
+
+
+async def _enrich_metadata(
+    isbn: str | None,
+    title: str,
+    author: str,
+    subjects: list[str],
+    author_url: str | None,
+    semaphore: asyncio.Semaphore,
+) -> dict:
+    """Fetch description/genres/author bio for a newly imported book.
+
+    Goodreads CSVs carry no description or author bio at all, so every
+    genuinely new book needs at least one enrichment round-trip to match
+    the data depth of a manual/ISBN import.
+    """
+    async with semaphore:
+        google = await _fetch_google_books_enrichment(isbn, title, author)
+        author_bio = await _fetch_openlibrary_author_bio(author_url)
+    genre_names = _clean_genre_names(subjects, google.get("categories", []))
+    return {
+        "description": google.get("description"),
+        "author_bio": author_bio,
+        "genre_names": genre_names,
+        "page_count": google.get("page_count"),
+        "published_date": _parse_loose_date(google.get("published_date")),
+        "external_rating": google.get("rating"),
+        "external_rating_count": google.get("rating_count"),
+        "buy_link": google.get("buy_link"),
+    }
 
 
 @router.post("/import")
@@ -154,6 +211,36 @@ async def import_goodreads_csv(
         )
         existing_user_books = set(ub_result.scalars().all())
 
+    # For rows that will become genuinely new books (no existing DB match),
+    # fetch description/genres/author bio so imported books reach the same
+    # data depth as a manual ISBN import instead of just title+author+cover.
+    enrich_semaphore = asyncio.Semaphore(ENRICH_CONCURRENCY)
+    enrich_tasks: dict[int, asyncio.Task] = {}
+    for idx, row in enumerate(rows):
+        title = row.get("Title", "").strip()
+        if not title:
+            continue
+        explicit_isbn = clean_isbn(row.get("ISBN", "")) or clean_isbn(row.get("ISBN13", ""))
+        search_match = search_results.get(idx, {})
+        isbn = explicit_isbn or search_match.get("isbn")
+        if isbn and isbn in existing_books_map:
+            continue
+        author = row.get("Author", "").strip()
+        enrich_tasks[idx] = asyncio.create_task(
+            _enrich_metadata(
+                isbn,
+                title,
+                author,
+                search_match.get("subjects", []),
+                search_match.get("author_url"),
+                enrich_semaphore,
+            )
+        )
+
+    enrich_results: dict[int, dict] = {}
+    for idx, task in enrich_tasks.items():
+        enrich_results[idx] = await task
+
     imported = 0
     skipped = 0
     errors = 0
@@ -197,12 +284,21 @@ async def import_goodreads_csv(
                         if isbn
                         else None
                     )
+                    enrichment = enrich_results.get(idx, {})
                     book = Book(
                         title=title,
                         author=author or "Unknown",
+                        author_bio=enrichment.get("author_bio"),
                         isbn=isbn,
+                        description=enrichment.get("description"),
                         cover_url=cover_url,
+                        publication_date=_csv_publication_date(row) or enrichment.get("published_date"),
+                        page_count=_csv_page_count(row) or enrichment.get("page_count"),
+                        external_rating=enrichment.get("external_rating"),
+                        external_rating_count=enrichment.get("external_rating_count"),
+                        buy_link=enrichment.get("buy_link"),
                     )
+                    book.genres = await _get_or_create_genres(db, enrichment.get("genre_names", []))
                     db.add(book)
                     await db.flush()
                     if isbn:
