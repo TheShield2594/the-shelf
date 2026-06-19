@@ -59,10 +59,12 @@ export interface BookSummary {
   id?: number;
   title: string;
   author: string;
+  author_bio?: string;
   isbn?: string;
   description?: string;
   cover_url?: string;
   publication_date?: string;
+  page_count?: number;
   genres: Genre[];
   avg_rating?: number;
   rating_count: number;

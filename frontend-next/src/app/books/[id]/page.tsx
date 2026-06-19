@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { api } from '@/lib/api';
 import { useAuth } from '@/components/AuthProvider';
@@ -137,7 +138,25 @@ export default function BookDetailPage() {
         </div>
         <div className="flex-1">
           <h1 className="text-3xl font-serif font-bold text-stone-900 dark:text-gray-100 mb-2">{book.title}</h1>
-          <p className="text-lg text-stone-600 dark:text-gray-400 mb-4">by {book.author}</p>
+          <p className="text-lg text-stone-600 dark:text-gray-400 mb-1">
+            by{' '}
+            <Link
+              href={`/authors/${encodeURIComponent(book.author)}`}
+              className="hover:text-shelf-700 dark:hover:text-shelf-500 hover:underline"
+            >
+              {book.author}
+            </Link>
+          </p>
+
+          {(book.publication_date || book.page_count) && (
+            <p className="text-sm text-stone-500 dark:text-gray-500 mb-4">
+              {book.publication_date && (
+                <span>Published {new Date(book.publication_date).getFullYear()}</span>
+              )}
+              {book.publication_date && book.page_count && <span> · </span>}
+              {book.page_count && <span>{book.page_count} pages</span>}
+            </p>
+          )}
 
           {book.genres.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-4">
@@ -158,6 +177,13 @@ export default function BookDetailPage() {
 
           {book.description && (
             <p className="text-stone-600 dark:text-gray-400 leading-relaxed mb-6">{book.description}</p>
+          )}
+
+          {book.author_bio && (
+            <div className="mb-6 p-4 rounded-lg bg-stone-50 dark:bg-gray-800/50">
+              <h2 className="text-sm font-semibold text-stone-800 dark:text-gray-200 mb-1">About {book.author}</h2>
+              <p className="text-sm text-stone-600 dark:text-gray-400 leading-relaxed">{book.author_bio}</p>
+            </div>
           )}
 
           {/* Radar chart toggle — lazy loaded only when requested */}

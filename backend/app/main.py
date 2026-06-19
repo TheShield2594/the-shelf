@@ -29,6 +29,7 @@ _COLUMN_MIGRATIONS = [
     "ALTER TABLE books ADD COLUMN IF NOT EXISTS external_rating FLOAT",
     "ALTER TABLE books ADD COLUMN IF NOT EXISTS external_rating_count INTEGER",
     "ALTER TABLE books ADD COLUMN IF NOT EXISTS buy_link VARCHAR(1000)",
+    "ALTER TABLE books ADD COLUMN IF NOT EXISTS page_count INTEGER",
 ]
 
 

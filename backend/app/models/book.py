@@ -23,6 +23,7 @@ class Book(Base):
     cover_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     publication_date: Mapped[datetime.date | None] = mapped_column(Date, nullable=True)
     author_bio: Mapped[str | None] = mapped_column(Text, nullable=True)
+    page_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     external_rating: Mapped[float | None] = mapped_column(Float, nullable=True)
     external_rating_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     buy_link: Mapped[str | None] = mapped_column(String(1000), nullable=True)
