@@ -23,6 +23,10 @@ async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield
+    # Close shared HTTP client to prevent socket leaks
+    from .routers.books import get_http_client
+    client = await get_http_client()
+    await client.aclose()
     await engine.dispose()
 
 
