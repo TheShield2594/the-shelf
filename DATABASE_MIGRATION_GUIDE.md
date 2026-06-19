@@ -10,58 +10,18 @@ This guide explains how to set up and run database migrations for The Shelf usin
 
 ## Initial Setup
 
-### 1. Install Dependencies
+Alembic is already initialized in `backend/alembic/`, with `env.py` wired up to
+`app.config.settings.database_url` and `Base.metadata` from `app.models`. The
+full current schema lives in the `initial schema` migration in
+`backend/alembic/versions/`. New deployments and fresh databases just need:
 
 ```bash
 cd backend
 pip install -r requirements.txt
+alembic upgrade head
 ```
 
-This will install:
-- `alembic` - Database migration tool
-- `pgvector` - PostgreSQL extension for vector similarity search
-- `sentence-transformers` - For generating book embeddings
-- `scikit-learn` - For recommendation algorithms
-- Other required packages
-
-### 2. Initialize Alembic (First Time Only)
-
-If this is the first time setting up the project:
-
-```bash
-cd backend
-alembic init alembic
-```
-
-### 3. Configure Alembic
-
-**Edit `backend/alembic.ini`:**
-
-```ini
-# Change this line:
-sqlalchemy.url = driver://user:pass@localhost/dbname
-
-# To use your database URL from environment:
-# sqlalchemy.url = postgresql+asyncpg://user:pass@localhost/the_shelf
-```
-
-**Edit `backend/alembic/env.py`:**
-
-```python
-# Add at the top (after imports):
-from app.config import settings
-from app.database import Base
-from app.models import *  # Import all models
-
-# Update the target_metadata:
-target_metadata = Base.metadata
-
-# Update the get_url() function:
-def get_url():
-    return settings.database_url
-```
-
-### 4. Enable pgvector Extension
+### Enable pgvector Extension
 
 Before running migrations, enable the pgvector extension in PostgreSQL:
 
@@ -346,6 +306,13 @@ alembic downgrade -1
 psql the_shelf < backup_20250213.sql
 ```
 
+## Docker / docker-compose Deployment
+
+The backend image's entrypoint (`backend/entrypoint.sh`) runs `alembic upgrade
+head` before starting uvicorn, so migrations apply automatically on every
+container start. No separate migration step is needed for the
+`docker-compose.yml` setup.
+
 ## Railway Deployment
 
 For serverless deployments, run migrations as part of the build process:
@@ -394,7 +361,6 @@ jobs:
 
 ## Summary
 
-- **Initialize**: `alembic init alembic` (one time)
 - **Create migration**: `alembic revision --autogenerate -m "message"`
 - **Apply migrations**: `alembic upgrade head`
 - **Rollback**: `alembic downgrade -1`

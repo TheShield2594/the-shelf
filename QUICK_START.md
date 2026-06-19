@@ -94,8 +94,6 @@ cp .env.example .env
 # DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost/the_shelf
 
 # Run database migrations
-alembic init alembic
-# Configure alembic.ini and alembic/env.py (see DATABASE_MIGRATION_GUIDE.md)
 alembic upgrade head
 
 # Seed database (optional)

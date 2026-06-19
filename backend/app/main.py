@@ -3,10 +3,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from sqlalchemy import text
 
 from .config import settings
-from .database import engine, Base
+from .database import engine
 from .routers import (
     auth,
     books,
@@ -19,26 +18,9 @@ from .routers import (
     gamification,
 )
 
-# Base.metadata.create_all only creates tables that don't exist yet — it never
-# adds columns to a table that's already there. There's no migration tool
-# wired up in this project, so new columns on existing models need an
-# explicit, idempotent ALTER TABLE here or they silently never reach
-# already-deployed databases (breaking every query against that table).
-_COLUMN_MIGRATIONS = [
-    "ALTER TABLE books ADD COLUMN IF NOT EXISTS author_bio TEXT",
-    "ALTER TABLE books ADD COLUMN IF NOT EXISTS external_rating FLOAT",
-    "ALTER TABLE books ADD COLUMN IF NOT EXISTS external_rating_count INTEGER",
-    "ALTER TABLE books ADD COLUMN IF NOT EXISTS buy_link VARCHAR(1000)",
-    "ALTER TABLE books ADD COLUMN IF NOT EXISTS page_count INTEGER",
-]
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-        for stmt in _COLUMN_MIGRATIONS:
-            await conn.execute(text(stmt))
     yield
     # Close shared HTTP client to prevent socket leaks
     from .routers.books import get_http_client

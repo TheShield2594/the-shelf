@@ -191,18 +191,7 @@ cd backend
 # Install dependencies (if not already)
 pip install -r requirements.txt
 
-# Initialize Alembic (if first time)
-alembic init alembic
-
-# Configure alembic.ini
-# Edit: sqlalchemy.url = (leave blank, we'll use env var)
-
-# Generate migration
-alembic revision --autogenerate -m "Add multi-dimensional ratings"
-
-# Review migration file in backend/alembic/versions/
-
-# Run migration
+# Run pending migrations
 alembic upgrade head
 
 # Verify
