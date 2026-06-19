@@ -62,7 +62,13 @@ export default function HomePage() {
             ))}
           </div>
         ) : (
-          <p className="text-stone-500 dark:text-gray-400">No books in the library yet.</p>
+          <div className="card p-8 text-center">
+            <p className="text-stone-600 dark:text-gray-400 mb-4">No books in the library yet.</p>
+            <div className="flex items-center justify-center gap-3">
+              <Link href="/browse" className="btn-primary">Browse Books</Link>
+              <Link href="/import" className="btn-secondary">Import from Goodreads</Link>
+            </div>
+          </div>
         )}
       </div>
     );
