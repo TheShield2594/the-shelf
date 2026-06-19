@@ -9,10 +9,23 @@ import type { UserProfile } from '@/types';
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { user, loading: authLoading, logout } = useAuth();
+  const { user, loading: authLoading, logout, refreshUser } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  const [newEmail, setNewEmail] = useState('');
+  const [emailPassword, setEmailPassword] = useState('');
+  const [emailMsg, setEmailMsg] = useState('');
+  const [emailErr, setEmailErr] = useState('');
+  const [emailSaving, setEmailSaving] = useState(false);
+
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordMsg, setPasswordMsg] = useState('');
+  const [passwordErr, setPasswordErr] = useState('');
+  const [passwordSaving, setPasswordSaving] = useState(false);
 
   useEffect(() => {
     if (authLoading) return;
@@ -40,6 +53,46 @@ export default function ProfilePage() {
   }
 
   if (!user || !profile) return null;
+
+  const handleEmailSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setEmailMsg('');
+    setEmailErr('');
+    setEmailSaving(true);
+    try {
+      await api.changeEmail(newEmail, emailPassword);
+      await refreshUser();
+      setEmailMsg('Email updated successfully.');
+      setNewEmail('');
+      setEmailPassword('');
+    } catch (err: any) {
+      setEmailErr(err.message || 'Failed to update email');
+    } finally {
+      setEmailSaving(false);
+    }
+  };
+
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordMsg('');
+    setPasswordErr('');
+    if (newPassword !== confirmPassword) {
+      setPasswordErr('New passwords do not match');
+      return;
+    }
+    setPasswordSaving(true);
+    try {
+      await api.changePassword(currentPassword, newPassword);
+      setPasswordMsg('Password updated successfully.');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err: any) {
+      setPasswordErr(err.message || 'Failed to update password');
+    } finally {
+      setPasswordSaving(false);
+    }
+  };
 
   const stats = [
     { label: 'Books Read', value: profile.books_read, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-950/30' },
@@ -82,6 +135,71 @@ export default function ProfilePage() {
           </div>
         ))}
       </div>
+
+      <h2 className="text-lg font-serif font-semibold text-stone-800 dark:text-gray-200 mt-8 mb-4">Account Settings</h2>
+
+      <form onSubmit={handleEmailSubmit} className="card p-6 mb-6">
+        <h3 className="font-serif font-semibold text-stone-900 dark:text-gray-100 mb-3">Change Email</h3>
+        {emailErr && <p className="text-sm text-red-500 dark:text-red-400 mb-3">{emailErr}</p>}
+        {emailMsg && <p className="text-sm text-emerald-600 dark:text-emerald-400 mb-3">{emailMsg}</p>}
+        <div className="space-y-3">
+          <input
+            type="email"
+            value={newEmail}
+            onChange={(e) => setNewEmail(e.target.value)}
+            placeholder="New email address"
+            required
+            className="input"
+          />
+          <input
+            type="password"
+            value={emailPassword}
+            onChange={(e) => setEmailPassword(e.target.value)}
+            placeholder="Current password"
+            required
+            className="input"
+          />
+          <button type="submit" disabled={emailSaving} className="btn-primary">
+            {emailSaving ? 'Saving...' : 'Update Email'}
+          </button>
+        </div>
+      </form>
+
+      <form onSubmit={handlePasswordSubmit} className="card p-6">
+        <h3 className="font-serif font-semibold text-stone-900 dark:text-gray-100 mb-3">Change Password</h3>
+        {passwordErr && <p className="text-sm text-red-500 dark:text-red-400 mb-3">{passwordErr}</p>}
+        {passwordMsg && <p className="text-sm text-emerald-600 dark:text-emerald-400 mb-3">{passwordMsg}</p>}
+        <div className="space-y-3">
+          <input
+            type="password"
+            value={currentPassword}
+            onChange={(e) => setCurrentPassword(e.target.value)}
+            placeholder="Current password"
+            required
+            className="input"
+          />
+          <input
+            type="password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            placeholder="New password"
+            required
+            minLength={8}
+            className="input"
+          />
+          <input
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            placeholder="Confirm new password"
+            required
+            className="input"
+          />
+          <button type="submit" disabled={passwordSaving} className="btn-primary">
+            {passwordSaving ? 'Saving...' : 'Update Password'}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }

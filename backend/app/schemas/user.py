@@ -27,6 +27,16 @@ class Token(BaseModel):
     token_type: str = "bearer"
 
 
+class PasswordChange(BaseModel):
+    current_password: str
+    new_password: str
+
+
+class EmailChange(BaseModel):
+    new_email: EmailStr
+    current_password: str
+
+
 class UserProfile(BaseModel):
     id: int
     username: str

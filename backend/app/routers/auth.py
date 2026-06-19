@@ -6,7 +6,7 @@ from ..database import get_db
 from ..models.user import User
 from ..models.user_book import UserBook
 from ..models.review import Review
-from ..schemas.user import UserCreate, UserLogin, UserOut, Token, UserProfile
+from ..schemas.user import UserCreate, UserLogin, UserOut, Token, UserProfile, PasswordChange, EmailChange
 from ..auth import hash_password, verify_password, create_access_token, get_current_user
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -72,3 +72,33 @@ async def profile(user: User = Depends(get_current_user), db: AsyncSession = Dep
         dnf=counts.get("dnf", 0),
         reviews_count=review_count.scalar(),
     )
+
+
+@router.put("/password", status_code=204)
+async def change_password(
+    data: PasswordChange,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if not verify_password(data.current_password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Current password is incorrect")
+    user.password_hash = hash_password(data.new_password)
+    await db.commit()
+
+
+@router.put("/email", response_model=UserOut)
+async def change_email(
+    data: EmailChange,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if not verify_password(data.current_password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Current password is incorrect")
+    existing = await db.execute(select(User).where(User.email == data.new_email))
+    other = existing.scalar_one_or_none()
+    if other and other.id != user.id:
+        raise HTTPException(status_code=400, detail="Email already in use")
+    user.email = data.new_email
+    await db.commit()
+    await db.refresh(user)
+    return user
