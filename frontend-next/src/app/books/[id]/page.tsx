@@ -2,12 +2,19 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import { api } from '@/lib/api';
 import { useAuth } from '@/components/AuthProvider';
 import { BookCover } from '@/components/BookCover';
 import { StarRating } from '@/components/StarRating';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import type { Book } from '@/types';
+
+// Lazy-load recharts only when radar chart is actually displayed
+const RadarChart = dynamic(() => import('@/components/RadarChart').then(m => m.RadarChart), {
+  ssr: false,
+  loading: () => <div className="h-64" />,
+});
 
 export default function BookDetailPage() {
   const params = useParams();
@@ -22,6 +29,7 @@ export default function BookDetailPage() {
   const [reviewText, setReviewText] = useState('');
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [reviewError, setReviewError] = useState('');
+  const [showRadarChart, setShowRadarChart] = useState(false);
 
   useEffect(() => {
     if (isNaN(bookId)) {
@@ -36,6 +44,7 @@ export default function BookDetailPage() {
       .catch(() => setLoading(false));
 
     if (user) {
+      // Use cached library data — avoids full refetch when available
       api.getLibrary().then((libs) => {
         const entry = libs.find((l) => l.book_id === bookId);
         if (entry) {
@@ -93,6 +102,7 @@ export default function BookDetailPage() {
       await api.createReview(bookId, reviewText);
       setReviewText('');
       setShowReviewForm(false);
+      // Re-fetch book with fresh review data (cache was invalidated by createReview)
       const updated = await api.getBook(bookId);
       setBook(updated);
     } catch (err: any) {
@@ -139,6 +149,17 @@ export default function BookDetailPage() {
           {book.description && (
             <p className="text-stone-600 dark:text-gray-400 leading-relaxed mb-6">{book.description}</p>
           )}
+
+          {/* Radar chart toggle — lazy loaded only when requested */}
+          <div className="mb-6">
+            <button
+              onClick={() => setShowRadarChart(!showRadarChart)}
+              className="text-sm text-shelf-700 dark:text-shelf-500 hover:underline"
+            >
+              {showRadarChart ? 'Hide' : 'Show'} Rating Dimensions
+            </button>
+            {showRadarChart && <RadarChart bookId={bookId} />}
+          </div>
 
           {/* Library actions */}
           {user ? (
@@ -206,7 +227,7 @@ export default function BookDetailPage() {
               <button onClick={handleSubmitReview} className="btn-primary text-sm">Post Review</button>
             </div>
           </div>
-        )}
+        )
 
         {book.reviews && book.reviews.length > 0 ? (
           <div className="space-y-4">
@@ -228,4 +249,3 @@ export default function BookDetailPage() {
       </div>
     </div>
   );
-}

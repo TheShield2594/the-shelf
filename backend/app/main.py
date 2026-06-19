@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 
 from .config import settings
 from .database import engine, Base
@@ -19,22 +20,22 @@ from .routers import (
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Only create tables on first run (when no tables exist).
-    # This avoids the overhead of running create_all on every startup.
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield
-    # Dispose of the connection pool cleanly on shutdown
     await engine.dispose()
 
 
 app = FastAPI(title="The Shelf", version="1.0.0", lifespan=lifespan)
 
+# Gzip compress responses > 1KB
+app.add_middleware(GZipMiddleware, minimum_size=1024)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins.split(","),
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["*"),
     allow_headers=["*"],
 )
 

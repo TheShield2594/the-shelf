@@ -1,59 +1,55 @@
 'use client';
 
-import {
-  Radar,
-  RadarChart as RechartsRadar,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
-  ResponsiveContainer,
-  Tooltip,
-} from 'recharts';
-import type { RadarChartDimension } from '@/types';
+import { useState, useEffect } from 'react';
+import { Radar, RadarChart as RechartsRadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts';
+import { api } from '@/lib/api';
 
 interface RadarChartProps {
-  data: RadarChartDimension[];
-  className?: string;
+  bookId: number;
 }
 
-export function RadarChart({ data, className = '' }: RadarChartProps) {
-  // Ensure data has fullMark set
-  const chartData = data.map((d) => ({
-    ...d,
-    fullMark: d.fullMark || 5,
-  }));
+const DIMENSION_LABELS: Record<string, string> = {
+  pace: 'Pace',
+  emotional_impact: 'Emotional Impact',
+  complexity: 'Complexity',
+  character_development: 'Character Dev',
+  plot_quality: 'Plot Quality',
+  prose_style: 'Prose Style',
+  originality: 'Originality',
+};
+
+export function RadarChart({ bookId }: RadarChartProps) {
+  const [chartData, setChartData] = useState<{ dimension: string; value: number }[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    api.getRadarChartData(bookId).then((data: any) => {
+      if (cancelled) return;
+      const entries = Object.entries(DIMENSION_LABELS).map(([key, label]) => ({
+        dimension: label,
+        value: data[key] ?? 3,
+      }));
+      setChartData(entries);
+      setLoading(false);
+    }).catch(() => {
+      if (!cancelled) setLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [bookId]);
+
+  if (loading) return <div className="h-64" />;
+  if (!chartData.length) return null;
 
   return (
-    <div className={className}>
-      <ResponsiveContainer width="100%" height={300}>
-        <RechartsRadar data={chartData}>
-          <PolarGrid stroke="#d1d5db" />
-          <PolarAngleAxis
-            dataKey="dimension"
-            tick={{ fill: '#6b7280', fontSize: 12 }}
-          />
-          <PolarRadiusAxis
-            angle={90}
-            domain={[0, 5]}
-            tick={{ fill: '#9ca3af', fontSize: 10 }}
-          />
-          <Radar
-            name="Rating"
-            dataKey="value"
-            stroke="#8B4513"
-            fill="#8B4513"
-            fillOpacity={0.6}
-          />
-          <Tooltip
-            contentStyle={{
-              backgroundColor: 'rgba(255, 255, 255, 0.95)',
-              border: '1px solid #d1d5db',
-              borderRadius: '0.5rem',
-              padding: '0.5rem',
-            }}
-            formatter={(value: number) => [value.toFixed(1), 'Score']}
-          />
-        </RechartsRadar>
+    <div className="h-64 w-full max-w-md">
+      <ResponsiveContainer width="100%" height="100%">
+        <RechartsRadarChart data={chartData}>
+          <PolarGrid />
+          <PolarAngleAxis dataKey="dimension" tick={{ fontSize: 11 }} />
+          <PolarRadiusAxis domain={[0, 5]} tickCount={6} />
+          <Radar dataKey="value" stroke="#846358" fill="#846358" fillOpacity={0.4} />
+        </RechartsRadarChart>
       </ResponsiveContainer>
     </div>
   );

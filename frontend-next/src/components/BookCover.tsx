@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, memo } from 'react';
 
 interface BookCoverProps {
   coverUrl?: string;
@@ -16,14 +16,26 @@ const sizeClasses = {
   xl: 'w-56 h-80',
 };
 
-export function BookCover({ coverUrl, title, author, size = 'md' }: BookCoverProps) {
+const sizePx = {
+  sm: { w: 80, h: 112 },
+  md: { w: 128, h: 192 },
+  lg: { w: 160, h: 240 },
+  xl: { w: 224, h: 320 },
+};
+
+function BookCoverImpl({ coverUrl, title, author, size = 'md' }: BookCoverProps) {
   const [error, setError] = useState(false);
 
   if (coverUrl && !error) {
+    const { w, h } = sizePx[size];
     return (
       <img
         src={coverUrl}
         alt={`Cover of ${title}`}
+        width={w}
+        height={h}
+        loading="lazy"
+        decoding="async"
         onError={() => setError(true)}
         className={`${sizeClasses[size]} object-cover rounded-lg shadow-md bg-stone-100 dark:bg-gray-800`}
       />
@@ -48,3 +60,5 @@ export function BookCover({ coverUrl, title, author, size = 'md' }: BookCoverPro
     </div>
   );
 }
+
+export const BookCover = memo(BookCoverImpl);

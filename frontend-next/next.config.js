@@ -2,6 +2,8 @@
 const nextConfig = {
   reactStrictMode: true,
   output: 'standalone',
+  poweredByHeader: false,
+  compress: true,
   images: {
     remotePatterns: [
       {
@@ -9,6 +11,8 @@ const nextConfig = {
         hostname: 'covers.openlibrary.org',
       },
     ],
+    formats: ['image/avif', 'image/webp'],
+    minimumCacheTTL: 86400, // 24 hours
   },
   async rewrites() {
     return [
@@ -18,6 +22,6 @@ const nextConfig = {
       },
     ];
   },
-}
+};
 
-module.exports = nextConfig
+module.exports = nextConfig;
