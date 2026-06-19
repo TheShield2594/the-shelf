@@ -29,7 +29,7 @@ def clean_isbn(raw: str) -> str | None:
     if not raw:
         return None
     cleaned = raw.strip()
-    if cleaned.startswith('="') and cleaned.endswith('"'):
+    if cleaned.startswith('="') and cleaned.endswith('""'):
         cleaned = cleaned[2:-1]
     cleaned = cleaned.replace("-", "").replace(" ", "").strip()
     if len(cleaned) == 13 and cleaned.isdigit():
@@ -111,61 +111,69 @@ async def import_goodreads_csv(
             results.append({"title": "(empty)", "status": "skipped"})
             continue
 
+        row_status = None
         try:
-            author = row.get("Author", "").strip()
-            isbn = clean_isbn(row.get("ISBN", "")) or clean_isbn(
-                row.get("ISBN13", "")
-            )
-            rating_str = row.get("My Rating", "0").strip()
-            rating = (
-                int(rating_str) if rating_str and rating_str != "0" else None
-            )
-            if rating is not None and not (1 <= rating <= 5):
-                rating = None
-
-            shelf = row.get("Exclusive Shelf", "to-read").strip()
-            status = STATUS_MAP.get(shelf, "want_to_read")
-
-            # Use pre-fetched book from batch lookup
-            book = existing_books_map.get(isbn) if isbn else None
-
-            if not book:
-                cover_url = (
-                    f"https://covers.openlibrary.org/b/isbn/{isbn}-M.jpg"
-                    if isbn
-                    else None
+            # Use savepoint isolation so an IntegrityError on one row
+            # doesn't invalidate the session for remaining rows
+            async with db.begin_nested():
+                author = row.get("Author", "").strip()
+                isbn = clean_isbn(row.get("ISBN", "")) or clean_isbn(
+                    row.get("ISBN13", "")
                 )
-                book = Book(
-                    title=title,
-                    author=author or "Unknown",
-                    isbn=isbn,
-                    cover_url=cover_url,
+                rating_str = row.get("My Rating", "0").strip()
+                rating = (
+                    int(rating_str) if rating_str and rating_str != "0" else None
                 )
-                db.add(book)
-                await db.flush()
-                if isbn:
-                    existing_books_map[isbn] = book
+                if rating is not None and not (1 <= rating <= 5):
+                    rating = None
 
-            # Check if already in user's library (using pre-fetched set)
-            if book.id in existing_user_books:
-                skipped += 1
-                results.append({"title": title, "status": "already_in_library"})
-            else:
-                now = datetime.now(timezone.utc)
-                ub = UserBook(
-                    user_id=user.id,
-                    book_id=book.id,
-                    status=status,
-                    rating=rating,
-                    date_started=now if status == "currently_reading" else None,
-                    date_finished=now if status == "finished" else None,
-                )
-                db.add(ub)
-                await db.flush()
-                existing_user_books.add(book.id)
+                shelf = row.get("Exclusive Shelf", "to-read").strip()
+                status = STATUS_MAP.get(shelf, "want_to_read")
+
+                # Use pre-fetched book from batch lookup
+                book = existing_books_map.get(isbn) if isbn else None
+
+                if not book:
+                    cover_url = (
+                        f"https://covers.openlibrary.org/b/isbn/{isbn}-M.jpg"
+                        if isbn
+                        else None
+                    )
+                    book = Book(
+                        title=title,
+                        author=author or "Unknown",
+                        isbn=isbn,
+                        cover_url=cover_url,
+                    )
+                    db.add(book)
+                    await db.flush()
+                    if isbn:
+                        existing_books_map[isbn] = book
+
+                # Check if already in user's library (using pre-fetched set)
+                if book.id in existing_user_books:
+                    row_status = "already_in_library"
+                else:
+                    now = datetime.now(timezone.utc)
+                    ub = UserBook(
+                        user_id=user.id,
+                        book_id=book.id,
+                        status=status,
+                        rating=rating,
+                        date_started=now if status == "currently_reading" else None,
+                        date_finished=now if status == "finished" else None,
+                    )
+                    db.add(ub)
+                    await db.flush()
+                    existing_user_books.add(book.id)
+                    row_status = "imported"
+
+            # Savepoint released successfully — update counters
+            if row_status == "imported":
                 imported += 1
-                results.append({"title": title, "status": "imported"})
-
+            else:
+                skipped += 1
+            results.append({"title": title, "status": row_status})
         except Exception as e:
             errors += 1
             results.append(
