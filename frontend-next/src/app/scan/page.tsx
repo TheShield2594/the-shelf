@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { useAuth } from '@/components/AuthProvider';
+import { useToast } from '@/components/ToastProvider';
 import { BookCover } from '@/components/BookCover';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import type { BookSummary } from '@/types';
@@ -13,6 +14,7 @@ type ScanState = 'idle' | 'camera_scanning' | 'lookup_scanning' | 'found' | 'not
 export default function ScanPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
+  const { showToast } = useToast();
   const [scanState, setScanState] = useState<ScanState>('idle');
   const [isbn, setIsbn] = useState('');
   const [manualIsbn, setManualIsbn] = useState('');
@@ -86,7 +88,7 @@ export default function ScanPage() {
       await api.addToLibrary(book.id, status);
       router.push('/library');
     } catch (err: any) {
-      alert(err.message);
+      showToast(err.message);
     } finally {
       setAdding(false);
     }

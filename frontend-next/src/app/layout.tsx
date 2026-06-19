@@ -3,6 +3,7 @@ import { Inter, Crimson_Text } from 'next/font/google';
 import './globals.css';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { AuthProvider } from '@/components/AuthProvider';
+import { ToastProvider } from '@/components/ToastProvider';
 import { Navbar } from '@/components/Navbar';
 
 const inter = Inter({
@@ -51,15 +52,17 @@ export default function RootLayout({
       <body className="font-sans antialiased">
         <ThemeProvider>
           <AuthProvider>
-            <div className="min-h-screen flex flex-col">
-              <Navbar />
-              <main className="flex-1">{children}</main>
-              <footer className="border-t border-stone-200 dark:border-gray-800 py-6 mt-12">
-                <div className="max-w-7xl mx-auto px-4 text-center text-sm text-stone-500 dark:text-gray-500">
-                  <p>The Shelf — Self-hosted book tracking</p>
-                </div>
-              </footer>
-            </div>
+            <ToastProvider>
+              <div className="min-h-screen flex flex-col">
+                <Navbar />
+                <main className="flex-1">{children}</main>
+                <footer className="border-t border-stone-200 dark:border-gray-800 py-6 mt-12">
+                  <div className="max-w-7xl mx-auto px-4 text-center text-sm text-stone-500 dark:text-gray-500">
+                    <p>The Shelf — Self-hosted book tracking</p>
+                  </div>
+                </footer>
+              </div>
+            </ToastProvider>
           </AuthProvider>
         </ThemeProvider>
         <script

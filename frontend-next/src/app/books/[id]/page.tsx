@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { api } from '@/lib/api';
 import { useAuth } from '@/components/AuthProvider';
+import { useToast } from '@/components/ToastProvider';
 import { BookCover } from '@/components/BookCover';
 import { StarRating } from '@/components/StarRating';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
@@ -20,6 +21,7 @@ export default function BookDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { user } = useAuth();
+  const { showToast } = useToast();
   const bookId = Number(params.id);
   const [book, setBook] = useState<Book | null>(null);
   const [loading, setLoading] = useState(true);
@@ -36,16 +38,22 @@ export default function BookDetailPage() {
       setLoading(false);
       return;
     }
-    api.getBook(bookId)
+    const controller = new AbortController();
+
+    api.getBook(bookId, controller.signal)
       .then((b) => {
+        if (controller.signal.aborted) return;
         setBook(b);
         setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
 
     if (user) {
       // Use cached library data — avoids full refetch when available
-      api.getLibrary().then((libs) => {
+      api.getLibrary(undefined, controller.signal).then((libs) => {
+        if (controller.signal.aborted) return;
         const entry = libs.find((l) => l.book_id === bookId);
         if (entry) {
           setInLibrary(true);
@@ -54,6 +62,8 @@ export default function BookDetailPage() {
         }
       }).catch(() => {});
     }
+
+    return () => controller.abort();
   }, [bookId, user]);
 
   const handleAddToLibrary = async (status: string) => {
@@ -62,7 +72,7 @@ export default function BookDetailPage() {
       setInLibrary(true);
       setLibStatus(status);
     } catch (err: any) {
-      alert(err.message);
+      showToast(err.message);
     }
   };
 
@@ -71,7 +81,7 @@ export default function BookDetailPage() {
       await api.updateLibraryEntry(bookId, { status });
       setLibStatus(status);
     } catch (err: any) {
-      alert(err.message);
+      showToast(err.message);
     }
   };
 
@@ -80,7 +90,7 @@ export default function BookDetailPage() {
       await api.updateLibraryEntry(bookId, { rating });
       setMyRating(rating);
     } catch (err: any) {
-      alert(err.message);
+      showToast(err.message);
     }
   };
 
@@ -91,7 +101,7 @@ export default function BookDetailPage() {
       setLibStatus('');
       setMyRating(null);
     } catch (err: any) {
-      alert(err.message);
+      showToast(err.message);
     }
   };
 

@@ -121,11 +121,6 @@ export interface UserBook {
   book: BookSummary;
 }
 
-export interface AuthTokens {
-  access_token: string;
-  token_type: string;
-}
-
 export interface APIError {
   detail: string;
 }
