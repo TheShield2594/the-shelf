@@ -143,6 +143,47 @@ export interface ISBNDetailLookupResult {
   book: BookSummary;
 }
 
+// Gamification (private, self-referential - see PRODUCT_VISION.md)
+export interface BadgeOut {
+  code: string;
+  name: string;
+  description: string;
+  earned_at: string;
+}
+
+export interface GamificationStats {
+  xp_total: number;
+  level: number;
+  current_streak: number;
+  longest_streak: number;
+  mascot_mood: 'neutral' | 'content' | 'happy' | 'ecstatic';
+  badges: BadgeOut[];
+}
+
+export interface ReadingSessionOut {
+  id: number;
+  book_id: number | null;
+  session_date: string;
+  minutes_read: number;
+  pages_read: number | null;
+}
+
+export interface LogSessionResponse {
+  session: ReadingSessionOut;
+  stats: GamificationStats;
+  new_badges: BadgeOut[];
+}
+
+export interface ChallengeOut {
+  code: string;
+  name: string;
+  description: string;
+  progress: number;
+  target: number;
+  completed: boolean;
+  period_start: string;
+}
+
 // Dimension metadata for UI
 export interface DimensionInfo {
   key: keyof Omit<MultiDimensionalRating, 'id' | 'user_id' | 'book_id' | 'star_equivalent' | 'created_at' | 'updated_at'>;

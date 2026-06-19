@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { useAuth } from '@/components/AuthProvider';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { GamificationPanel } from '@/components/GamificationPanel';
+import { ChallengesCard } from '@/components/ChallengesCard';
 import type { UserProfile } from '@/types';
 
 export default function ProfilePage() {
@@ -134,6 +136,12 @@ export default function ProfilePage() {
             <p className="text-xs text-stone-600 dark:text-gray-400 mt-1">{stat.label}</p>
           </div>
         ))}
+      </div>
+
+      <h2 className="text-lg font-serif font-semibold text-stone-800 dark:text-gray-200 mt-8 mb-4">Reading Companion</h2>
+      <div className="space-y-6">
+        <GamificationPanel />
+        <ChallengesCard />
       </div>
 
       <h2 className="text-lg font-serif font-semibold text-stone-800 dark:text-gray-200 mt-8 mb-4">Account Settings</h2>

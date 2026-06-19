@@ -10,6 +10,7 @@ from ..auth import get_current_user
 from ..models.user import User
 from ..models.book import Book
 from ..models.multi_dimensional_rating import MultiDimensionalRating, BookFingerprint
+from .gamification import check_deep_dive_badge
 from ..schemas.multi_dimensional_rating import (
     MultiDimensionalRatingCreate,
     MultiDimensionalRatingResponse,
@@ -56,6 +57,8 @@ async def create_or_update_rating(
     await db.refresh(rating)
 
     await update_book_fingerprint(db, rating_data.book_id)
+    await check_deep_dive_badge(db, current_user.id, rating)
+    await db.commit()
 
     return rating
 

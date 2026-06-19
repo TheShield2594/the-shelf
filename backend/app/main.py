@@ -16,6 +16,7 @@ from .routers import (
     content_ratings,
     multi_dimensional_ratings,
     goodreads,
+    gamification,
 )
 
 # Base.metadata.create_all only creates tables that don't exist yet — it never
@@ -66,6 +67,7 @@ app.include_router(reviews.router)
 app.include_router(content_ratings.router)
 app.include_router(multi_dimensional_ratings.router)
 app.include_router(goodreads.router)
+app.include_router(gamification.router)
 
 
 @app.get("/api/health")

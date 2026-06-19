@@ -75,12 +75,13 @@
 
 ## The Shelf's Opinionated Philosophy
 
-### 1. **Quality Over Quantity**
-We don't care if you read 100 books or 10 books a year. We care about helping you find books that matter to you and giving you space to reflect on them.
+### 1. **Quality Over Quantity, Reinforced by Personal Habit-Building**
+We don't care if you read 100 books or 10 books a year. We care about helping you find books that matter to you, giving you space to reflect on them, and helping you actually keep reading — the way Whoop or Bevel motivate a health habit without turning it into a competition.
 
 **Implications:**
-- No reading challenges or streaks
-- No public "books read this year" counters
+- Private streaks, XP, and badges reward *consistency and depth* (showing up, rating thoughtfully, finishing what you start) — never raw page/book counts
+- No public "books read this year" counters, no leaderboards, no social comparison
+- A personal mascot companion reflects your own patterns back to you, not anyone else's
 - Focus on depth, not breadth
 
 ### 2. **Context is Everything**
@@ -215,7 +216,7 @@ from your Want to Read list that match:"
 - Personal reading pace tracker
 - Genre/mood distribution over time
 - Re-read tracking (surface books to revisit)
-- Reading streaks without gamification (just informational)
+- Reading streaks, XP, and badges — private, self-referential gamification (see "Personal Reading Companion" below)
 - Export to JSON/CSV for external analysis
 
 ### 5. **Smart Review System**
@@ -266,7 +267,24 @@ from your Want to Read list that match:"
 - Activity feed of everyone you follow
 - Likes/reactions to reviews (only "Helpful" votes)
 
-### 7. **Format-Aware Tracking**
+### 7. **Personal Reading Companion (Whoop-Style Gamification)**
+
+**The Insight:** Goodreads' reading challenge fails because it's a public, quantity-only counter. Whoop and Bevel succeed at habit-building because their feedback loop is entirely personal — your recovery score, your streak, your trends, compared only to your own baseline.
+
+**Features:**
+- **Streaks** for showing up to read, not for page/book volume
+- **XP & levels** earned from logging sessions and engaging deeply (multi-dimensional ratings, finishing long-paused books)
+- **Badges** for meaningful behaviors (first session, 3/7/30-day streaks, picking reading back up after a break, rating a book across all seven dimensions) — never for sheer book count
+- **Weekly personal quests** (read on 4 different days, spend 100 minutes reading, finish a long-dormant book, rate a book across all seven dimensions) — evaluated only against your own activity, never compared across users
+- **A mascot companion** whose mood reflects your current streak/consistency, giving the dashboard warmth without competition
+- **Strictly private:** none of this is shown to other users, posted publicly, or used in any leaderboard — it exists only to help you build your own habit
+
+**Why this works:**
+- Motivates return visits and habit formation, addressing the #1 reason people leave Goodreads for nothing (no compelling reason to open the app)
+- Stays true to "quality over quantity" because what's rewarded is consistency and depth, not volume
+- Self-hosted users get the full benefit even with zero social features active
+
+### 8. **Format-Aware Tracking**
 
 **Recognition:** Audiobooks, ebooks, and physical books are different experiences
 
@@ -325,6 +343,12 @@ from your Want to Read list that match:"
 - [ ] Reading timeline (visualize history)
 - [ ] Genre distribution
 
+#### Personal Gamification (Private)
+- [ ] Reading session logging (date, minutes, pages)
+- [ ] Streaks, XP, and levels based on consistency
+- [ ] Badges for meaningful behaviors (not raw volume)
+- [ ] Mascot companion reflecting current streak/mood
+
 #### Content Safety
 - [ ] Community content ratings (violence, language, sexual content, substance use)
 - [ ] Filter searches by content levels
@@ -334,7 +358,6 @@ from your Want to Read list that match:"
 - [ ] Reading mood tags
 - [ ] Dark mode
 - [ ] Mobile-responsive design
-- [ ] Reading challenges (opt-in, non-public)
 
 ---
 

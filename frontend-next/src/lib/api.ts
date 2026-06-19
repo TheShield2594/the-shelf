@@ -13,6 +13,10 @@ import type {
   APIError,
   GoodreadsImportResult,
   ISBNDetailLookupResult,
+  GamificationStats,
+  ReadingSessionOut,
+  LogSessionResponse,
+  ChallengeOut,
 } from '@/types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
@@ -305,6 +309,41 @@ class APIClient {
     const data = await this.request<RadarChartData>(`/api/ratings/${bookId}/chart-data`);
     this.setCached(cacheKey, data, 30_000);
     return data;
+  }
+
+  // Gamification (private, self-referential stats - streaks, XP, badges)
+  async getGamificationStats(): Promise<GamificationStats> {
+    const cached = this.getCached<GamificationStats>('gamification_stats', 10_000);
+    if (cached) return cached;
+    const stats = await this.request<GamificationStats>('/api/gamification/stats');
+    this.setCached('gamification_stats', stats, 10_000);
+    return stats;
+  }
+
+  async getReadingSessions(limit = 30): Promise<ReadingSessionOut[]> {
+    return this.request<ReadingSessionOut[]>(`/api/gamification/sessions?limit=${limit}`);
+  }
+
+  async logReadingSession(data: {
+    session_date: string;
+    minutes_read: number;
+    pages_read?: number;
+    book_id?: number;
+  }): Promise<LogSessionResponse> {
+    const result = await this.request<LogSessionResponse>('/api/gamification/sessions', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    this.invalidateCache('gamification');
+    return result;
+  }
+
+  async getChallenges(): Promise<ChallengeOut[]> {
+    const cached = this.getCached<ChallengeOut[]>('challenges', 10_000);
+    if (cached) return cached;
+    const challenges = await this.request<ChallengeOut[]>('/api/gamification/challenges');
+    this.setCached('challenges', challenges, 10_000);
+    return challenges;
   }
 }
 

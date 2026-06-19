@@ -96,7 +96,7 @@ export default function BrowsePage() {
 
   const handleRemoveBook = async (book: BookSummary) => {
     if (!book.id) return;
-    if (!confirm(`Remove "${book.title}" from your shelf? This deletes it for everyone.`)) return;
+    if (!confirm(`Remove "${book.title}" from your shelf catalog? This is permanent and also removes it from your library.`)) return;
     try {
       await api.deleteBook(book.id);
       setBooks((prev) => prev.filter((b) => b.id !== book.id));
@@ -145,7 +145,7 @@ export default function BrowsePage() {
         >
           On Your Shelf
         </button>
-        <Tooltip text="These are all the books already in your shelf's catalog. Hover a cover and click Remove to delete a book entirely (this can't be undone)." />
+        <Tooltip text="These are all the books already in your shelf's catalog. Hover a cover and click Remove to permanently delete a book from the catalog and your library (this can't be undone)." />
         <button
           onClick={() => setSearchMode('external')}
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
