@@ -185,4 +185,17 @@ async def remove_from_library(
     if not ub:
         raise HTTPException(status_code=404, detail="Book not in library")
     await db.delete(ub)
+    await db.flush()
+
+    # If no other user has this book in their library, remove it from the
+    # shelf catalog entirely so it doesn't linger in Browse with no owner.
+    other_result = await db.execute(
+        select(UserBook.id).where(UserBook.book_id == book_id).limit(1)
+    )
+    if other_result.scalar_one_or_none() is None:
+        book_result = await db.execute(select(Book).where(Book.id == book_id))
+        book = book_result.scalar_one_or_none()
+        if book:
+            await db.delete(book)
+
     await db.commit()
