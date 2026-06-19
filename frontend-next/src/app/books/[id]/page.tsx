@@ -227,7 +227,7 @@ export default function BookDetailPage() {
               <button onClick={handleSubmitReview} className="btn-primary text-sm">Post Review</button>
             </div>
           </div>
-        )
+        )}
 
         {book.reviews && book.reviews.length > 0 ? (
           <div className="space-y-4">
@@ -249,3 +249,4 @@ export default function BookDetailPage() {
       </div>
     </div>
   );
+}
