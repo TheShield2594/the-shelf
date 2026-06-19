@@ -5,6 +5,7 @@ import { api } from '@/lib/api';
 import { BookCard } from '@/components/BookCard';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { EmptyState } from '@/components/EmptyState';
+import { BookDetailModal } from '@/components/BookDetailModal';
 import type { BookSummary } from '@/types';
 
 export default function BrowsePage() {
@@ -14,6 +15,8 @@ export default function BrowsePage() {
   const [searchMode, setSearchMode] = useState<'shelf' | 'external'>('shelf');
   const [externalResults, setExternalResults] = useState<BookSummary[]>([]);
   const [importing, setImporting] = useState<number | null>(null);
+  const [importedKeys, setImportedKeys] = useState<Set<string>>(new Set());
+  const [previewBook, setPreviewBook] = useState<BookSummary | null>(null);
 
   const loadBooks = useCallback(async () => {
     setLoading(true);
@@ -47,6 +50,8 @@ export default function BrowsePage() {
     }
   };
 
+  const bookKey = (book: BookSummary) => book.isbn || `${book.title.toLowerCase()}-${book.author.toLowerCase()}`;
+
   const handleImport = async (book: BookSummary, idx: number) => {
     setImporting(idx);
     try {
@@ -58,6 +63,7 @@ export default function BrowsePage() {
         publication_date: book.publication_date,
       });
       setBooks((prev) => [created, ...prev]);
+      setImportedKeys((prev) => new Set(prev).add(bookKey(book)));
     } catch (err: any) {
       alert(err.message || 'Failed to import book');
     } finally {
@@ -76,7 +82,7 @@ export default function BrowsePage() {
       {/* Search bar */}
       <div className="flex gap-2 mb-4">
         <div className="flex-1 relative">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-stone-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-stone-400 dark:text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
           </svg>
           <input
@@ -85,7 +91,7 @@ export default function BrowsePage() {
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && searchMode === 'external' && handleExternalSearch()}
             placeholder="Search by title or author..."
-            className="input pl-10"
+            className="input-search pl-10"
           />
         </div>
         {searchMode === 'external' && (
@@ -126,21 +132,34 @@ export default function BrowsePage() {
         />
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-          {displayBooks.map((book, idx) => (
-            <div key={`${book.id || book.isbn}-${idx}`} className="relative">
-              <BookCard book={book} />
-              {searchMode === 'external' && !book.id && (
-                <button
-                  onClick={() => handleImport(book, idx)}
-                  disabled={importing === idx}
-                  className="absolute top-2 right-2 bg-shelf-700 hover:bg-shelf-800 text-white rounded-lg px-2 py-1 text-xs shadow-md transition-colors disabled:opacity-50"
-                >
-                  {importing === idx ? '...' : '+ Add'}
-                </button>
-              )}
-            </div>
-          ))}
+          {displayBooks.map((book, idx) => {
+            const alreadyImported = searchMode === 'external' && importedKeys.has(bookKey(book));
+            return (
+              <div key={`${book.id || book.isbn}-${idx}`} className="relative">
+                {searchMode === 'external' && !book.id ? (
+                  <button onClick={() => setPreviewBook(book)} className="group block w-full text-left">
+                    <BookCard book={book} />
+                  </button>
+                ) : (
+                  <BookCard book={book} />
+                )}
+                {searchMode === 'external' && !book.id && (
+                  <button
+                    onClick={() => handleImport(book, idx)}
+                    disabled={importing === idx || alreadyImported}
+                    className="absolute top-2 right-2 bg-shelf-700 hover:bg-shelf-800 text-white rounded-lg px-2 py-1 text-xs shadow-md transition-colors disabled:opacity-50"
+                  >
+                    {importing === idx ? '...' : alreadyImported ? 'Added' : '+ Add'}
+                  </button>
+                )}
+              </div>
+            );
+          })}
         </div>
+      )}
+
+      {previewBook && (
+        <BookDetailModal book={previewBook} onClose={() => setPreviewBook(null)} />
       )}
     </div>
   );
