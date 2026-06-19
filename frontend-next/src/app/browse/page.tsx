@@ -6,6 +6,7 @@ import { BookCard } from '@/components/BookCard';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { EmptyState } from '@/components/EmptyState';
 import { BookDetailModal } from '@/components/BookDetailModal';
+import { Tooltip } from '@/components/Tooltip';
 import type { BookSummary } from '@/types';
 
 export default function BrowsePage() {
@@ -93,6 +94,17 @@ export default function BrowsePage() {
     }
   };
 
+  const handleRemoveBook = async (book: BookSummary) => {
+    if (!book.id) return;
+    if (!confirm(`Remove "${book.title}" from your shelf? This deletes it for everyone.`)) return;
+    try {
+      await api.deleteBook(book.id);
+      setBooks((prev) => prev.filter((b) => b.id !== book.id));
+    } catch (err: any) {
+      alert(err.message || 'Failed to remove book');
+    }
+  };
+
   const displayBooks = searchMode === 'external' ? externalResults : books;
 
   return (
@@ -122,7 +134,7 @@ export default function BrowsePage() {
       </div>
 
       {/* Mode toggle */}
-      <div className="flex gap-2 mb-6">
+      <div className="flex items-center gap-2 mb-6">
         <button
           onClick={() => { setSearchMode('shelf'); setExternalResults([]); }}
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
@@ -133,6 +145,7 @@ export default function BrowsePage() {
         >
           On Your Shelf
         </button>
+        <Tooltip text="These are all the books already in your shelf's catalog. Hover a cover and click Remove to delete a book entirely (this can't be undone)." />
         <button
           onClick={() => setSearchMode('external')}
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
@@ -153,7 +166,7 @@ export default function BrowsePage() {
           description={searchMode === 'external' ? 'Try a different search term.' : 'Add books by scanning a barcode or importing from Goodreads.'}
         />
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 items-start">
           {displayBooks.map((book, idx) => {
             const alreadyImported = searchMode === 'external' && importedKeys.has(bookKey(book));
             return (
@@ -172,6 +185,14 @@ export default function BrowsePage() {
                     className="absolute top-2 right-2 bg-shelf-700 hover:bg-shelf-800 text-white rounded-lg px-2 py-1 text-xs shadow-md transition-colors disabled:opacity-50"
                   >
                     {importing === idx ? '...' : alreadyImported ? 'Added' : '+ Add'}
+                  </button>
+                )}
+                {searchMode === 'shelf' && book.id && (
+                  <button
+                    onClick={() => handleRemoveBook(book)}
+                    className="absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white rounded-lg px-2 py-1 text-xs shadow-md transition-colors"
+                  >
+                    Remove
                   </button>
                 )}
               </div>

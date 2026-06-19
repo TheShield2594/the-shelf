@@ -137,7 +137,28 @@ class APIClient {
     return profile;
   }
 
+  async changePassword(currentPassword: string, newPassword: string): Promise<void> {
+    await this.request<void>('/api/auth/password', {
+      method: 'PUT',
+      body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+    });
+  }
+
+  async changeEmail(newEmail: string, currentPassword: string): Promise<User> {
+    const user = await this.request<User>('/api/auth/email', {
+      method: 'PUT',
+      body: JSON.stringify({ new_email: newEmail, current_password: currentPassword }),
+    });
+    this.invalidateCache('current_user');
+    return user;
+  }
+
   // Books
+  async deleteBook(bookId: number): Promise<void> {
+    await this.request<void>(`/api/books/${bookId}`, { method: 'DELETE' });
+    this.invalidateCache('books');
+  }
+
   async getBooks(params?: Record<string, string>, signal?: AbortSignal): Promise<BookSummary[]> {
     const query = params ? `?${new URLSearchParams(params).toString()}` : '';
     const cacheKey = `books${query}`;

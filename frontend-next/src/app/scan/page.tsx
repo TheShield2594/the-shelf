@@ -172,8 +172,19 @@ export default function ScanPage() {
 
       {scanState === 'error' && (
         <div className="card p-8 text-center">
-          <p className="text-stone-600 dark:text-gray-400 mb-4">Could not access camera. You can enter the ISBN manually below.</p>
-          <button onClick={handleReset} className="btn-primary mb-4">Go Back</button>
+          <p className="text-stone-600 dark:text-gray-400 mb-6">Could not access camera. You can enter the ISBN manually below.</p>
+          <form onSubmit={handleManualLookup} className="flex gap-2 mb-4">
+            <input
+              type="text"
+              value={manualIsbn}
+              onChange={(e) => setManualIsbn(e.target.value)}
+              placeholder="9780000000000"
+              className="input"
+              autoFocus
+            />
+            <button type="submit" className="btn-secondary whitespace-nowrap">Look Up</button>
+          </form>
+          <button onClick={handleReset} className="btn-ghost">Go Back</button>
         </div>
       )}
     </div>
