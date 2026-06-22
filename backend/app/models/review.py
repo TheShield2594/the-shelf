@@ -22,3 +22,7 @@ class Review(Base):
 
     user: Mapped["User"] = relationship(back_populates="reviews")  # noqa: F821
     book: Mapped["Book"] = relationship(back_populates="reviews")  # noqa: F821
+
+    @property
+    def username(self) -> str:
+        return self.user.username

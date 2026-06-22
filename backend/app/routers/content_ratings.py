@@ -21,21 +21,7 @@ async def get_book_content_ratings(book_id: int, db: AsyncSession = Depends(get_
         .where(ContentRating.book_id == book_id)
     )
     ratings = result.scalars().all()
-    return [
-        {
-            "id": r.id,
-            "book_id": r.book_id,
-            "user_id": r.user_id,
-            "username": r.user.username,
-            "violence_level": r.violence_level,
-            "language_level": r.language_level,
-            "sexual_content_level": r.sexual_content_level,
-            "substance_use_level": r.substance_use_level,
-            "other_tags": r.other_tags or [],
-            "created_at": r.created_at,
-        }
-        for r in ratings
-    ]
+    return ratings
 
 
 @router.post("", response_model=ContentRatingOut, status_code=201)
@@ -78,18 +64,8 @@ async def create_content_rating(
     db.add(cr)
     await db.commit()
     await db.refresh(cr)
-    return {
-        "id": cr.id,
-        "book_id": cr.book_id,
-        "user_id": cr.user_id,
-        "username": user.username,
-        "violence_level": cr.violence_level,
-        "language_level": cr.language_level,
-        "sexual_content_level": cr.sexual_content_level,
-        "substance_use_level": cr.substance_use_level,
-        "other_tags": cr.other_tags or [],
-        "created_at": cr.created_at,
-    }
+    cr.user = user
+    return cr
 
 
 @router.put("/{rating_id}", response_model=ContentRatingOut)
@@ -113,15 +89,5 @@ async def update_content_rating(
 
     await db.commit()
     await db.refresh(cr)
-    return {
-        "id": cr.id,
-        "book_id": cr.book_id,
-        "user_id": cr.user_id,
-        "username": user.username,
-        "violence_level": cr.violence_level,
-        "language_level": cr.language_level,
-        "sexual_content_level": cr.sexual_content_level,
-        "substance_use_level": cr.substance_use_level,
-        "other_tags": cr.other_tags or [],
-        "created_at": cr.created_at,
-    }
+    cr.user = user
+    return cr

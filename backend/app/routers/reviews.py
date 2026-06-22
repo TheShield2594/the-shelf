@@ -21,18 +21,7 @@ async def get_book_reviews(book_id: int, db: AsyncSession = Depends(get_db)):
         .order_by(Review.created_at.desc())
     )
     reviews = result.scalars().all()
-    return [
-        {
-            "id": r.id,
-            "user_id": r.user_id,
-            "username": r.user.username,
-            "book_id": r.book_id,
-            "review_text": r.review_text,
-            "created_at": r.created_at,
-            "updated_at": r.updated_at,
-        }
-        for r in reviews
-    ]
+    return reviews
 
 
 @router.post("", response_model=ReviewOut, status_code=201)
@@ -55,15 +44,8 @@ async def create_review(
     db.add(review)
     await db.commit()
     await db.refresh(review)
-    return {
-        "id": review.id,
-        "user_id": review.user_id,
-        "username": user.username,
-        "book_id": review.book_id,
-        "review_text": review.review_text,
-        "created_at": review.created_at,
-        "updated_at": review.updated_at,
-    }
+    review.user = user
+    return review
 
 
 @router.put("/{review_id}", response_model=ReviewOut)
@@ -83,15 +65,8 @@ async def update_review(
     review.review_text = data.review_text
     await db.commit()
     await db.refresh(review)
-    return {
-        "id": review.id,
-        "user_id": review.user_id,
-        "username": user.username,
-        "book_id": review.book_id,
-        "review_text": review.review_text,
-        "created_at": review.created_at,
-        "updated_at": review.updated_at,
-    }
+    review.user = user
+    return review
 
 
 @router.delete("/{review_id}", status_code=204)

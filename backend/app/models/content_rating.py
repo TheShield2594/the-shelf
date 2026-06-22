@@ -26,3 +26,7 @@ class ContentRating(Base):
 
     book: Mapped["Book"] = relationship(back_populates="content_ratings")  # noqa: F821
     user: Mapped["User"] = relationship(back_populates="content_ratings")  # noqa: F821
+
+    @property
+    def username(self) -> str:
+        return self.user.username
