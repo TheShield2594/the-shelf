@@ -1,5 +1,10 @@
 # Common Sense Media API Integration
 
+> **Not implemented.** This is a design spec for a future integration; the
+> backend has no CSM client or config for it today. The Shelf currently uses
+> the community-driven content ratings described in
+> [CONTENT_RATINGS.md](../../CONTENT_RATINGS.md) instead.
+
 This document explains how to integrate Common Sense Media (CSM) content ratings into The Shelf.
 
 ## Overview

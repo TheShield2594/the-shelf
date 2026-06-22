@@ -19,6 +19,9 @@ build/
 .env*
 !.env.example
 
+# Database backups
+/backups/
+
 # IDE
 .idea/
 .vscode/

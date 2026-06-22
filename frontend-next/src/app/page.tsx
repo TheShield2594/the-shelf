@@ -30,7 +30,7 @@ export default function HomePage() {
           <h1 className="text-3xl font-serif font-bold text-stone-900 dark:text-gray-100">
             Welcome back, {user.username}
           </h1>
-          <p className="text-stone-500 dark:text-gray-400 mt-1">Here's your reading shelf</p>
+          <p className="text-stone-500 dark:text-gray-400 mt-1">Here&apos;s your reading shelf</p>
         </div>
 
         {profile && (

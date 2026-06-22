@@ -139,7 +139,7 @@ export function GamificationPanel() {
 
       <form onSubmit={handleLogSession} className="card p-5">
         <p className="font-serif font-semibold text-stone-900 dark:text-gray-100 mb-3">
-          Log today's reading
+          Log today&apos;s reading
         </p>
         {logMsg && <p className="text-sm text-emerald-600 dark:text-emerald-400 mb-3">{logMsg}</p>}
         <div className="flex gap-3 flex-wrap">

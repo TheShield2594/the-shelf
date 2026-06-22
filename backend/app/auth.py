@@ -1,3 +1,4 @@
+import hashlib
 from datetime import datetime, timedelta, timezone
 
 from fastapi import Depends, HTTPException, Request, Response, status
@@ -14,6 +15,7 @@ from .models.user import User
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 COOKIE_NAME = "access_token"
+PASSWORD_RESET_TOKEN_TYPE = "password_reset"
 
 
 def hash_password(password: str) -> str:
@@ -29,6 +31,35 @@ def create_access_token(data: dict) -> str:
     expire = datetime.now(timezone.utc) + timedelta(minutes=settings.access_token_expire_minutes)
     to_encode["exp"] = expire
     return jwt.encode(to_encode, settings.secret_key, algorithm=settings.algorithm)
+
+
+def password_fingerprint(password_hash: str) -> str:
+    """Cheap fingerprint of a password hash, used to invalidate reset tokens
+    once the password they target has already been changed."""
+    return hashlib.sha256(password_hash.encode()).hexdigest()
+
+
+def create_password_reset_token(user: User) -> str:
+    expire = datetime.now(timezone.utc) + timedelta(
+        minutes=settings.password_reset_expire_minutes
+    )
+    payload = {
+        "sub": str(user.id),
+        "type": PASSWORD_RESET_TOKEN_TYPE,
+        "pwh": password_fingerprint(user.password_hash),
+        "exp": expire,
+    }
+    return jwt.encode(payload, settings.secret_key, algorithm=settings.algorithm)
+
+
+def decode_password_reset_token(token: str) -> dict | None:
+    try:
+        payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
+    except JWTError:
+        return None
+    if payload.get("type") != PASSWORD_RESET_TOKEN_TYPE:
+        return None
+    return payload
 
 
 def set_auth_cookie(response: Response, token: str) -> None:

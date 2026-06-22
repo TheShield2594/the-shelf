@@ -144,6 +144,20 @@ class APIClient {
     return user;
   }
 
+  async forgotPassword(email: string): Promise<void> {
+    await this.request<void>('/api/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<void> {
+    await this.request<void>('/api/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ token, new_password: newPassword }),
+    });
+  }
+
   // Books
   async deleteBook(bookId: number): Promise<void> {
     await this.request<void>(`/api/books/${bookId}`, { method: 'DELETE' });

@@ -240,7 +240,7 @@ All components use Tailwind CSS utility classes with consistent spacing (4px bas
 
 ## Contributing
 
-See [ARCHITECTURE.md](../ARCHITECTURE.md) and [IMPLEMENTATION_ROADMAP.md](../IMPLEMENTATION_ROADMAP.md) for technical details.
+See [ARCHITECTURE.md](../docs/planning/ARCHITECTURE.md) and [IMPLEMENTATION_ROADMAP.md](../docs/planning/IMPLEMENTATION_ROADMAP.md) for historical technical design notes, or the root [README.md](../README.md) for the current setup.
 
 ## License
 

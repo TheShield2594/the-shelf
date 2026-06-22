@@ -133,7 +133,7 @@ export function BookFingerprint({ bookId, initialFingerprint }: BookFingerprintP
       {/* What this means */}
       <div className="mt-6 pt-6 border-t border-gray-200">
         <p className="text-xs text-gray-500 italic">
-          This "fingerprint" shows the average rating across all dimensions.
+          This &quot;fingerprint&quot; shows the average rating across all dimensions.
           It helps you find books with a similar feel, not just genre.
         </p>
       </div>

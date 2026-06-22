@@ -140,8 +140,8 @@ export function MultiDimensionalRatingForm({
       <div className="text-sm text-gray-600 bg-blue-50 border border-blue-200 rounded-lg p-4">
         <p className="font-medium mb-2">💡 Tips for rating:</p>
         <ul className="list-disc list-inside space-y-1">
-          <li>Rate based on your experience, not what you think it "should" be</li>
-          <li>You don't need to rate every dimension - skip what doesn't apply</li>
+          <li>Rate based on your experience, not what you think it &quot;should&quot; be</li>
+          <li>You don&apos;t need to rate every dimension - skip what doesn&apos;t apply</li>
           <li>Your ratings help others find books with similar feels</li>
         </ul>
       </div>

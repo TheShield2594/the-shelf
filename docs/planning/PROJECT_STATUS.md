@@ -1,5 +1,11 @@
 # The Shelf - Project Status Report
 
+> **Historical planning document.** This is a point-in-time snapshot from
+> early in the project and does not reflect the current state of the repo
+> (the frontend has since migrated to Next.js, and tests/CI/auth hardening
+> have since been added). See [README.md](../../README.md) for what's
+> actually implemented today.
+
 **Date:** February 13, 2025
 **Branch:** `claude/book-tracking-platform-sjr34`
 **Status:** 🟢 Strategic Foundation Complete + Backend API Implemented
