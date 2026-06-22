@@ -73,8 +73,8 @@ export default function ImportPage() {
         <p className="font-medium text-stone-700 dark:text-gray-300 mb-2">How to export from Goodreads:</p>
         <ol className="list-decimal list-inside space-y-1">
           <li>Go to Goodreads → My Books</li>
-          <li>Click "Import/Export" at the bottom left</li>
-          <li>Click "Export Library"</li>
+          <li>Click &quot;Import/Export&quot; at the bottom left</li>
+          <li>Click &quot;Export Library&quot;</li>
           <li>Wait for the CSV file to generate, then download it</li>
         </ol>
       </div>

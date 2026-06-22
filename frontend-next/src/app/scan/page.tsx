@@ -110,7 +110,7 @@ export default function ScanPage() {
           <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="mx-auto mb-4 text-shelf-600 dark:text-shelf-500">
             <path d="M3 5h2v2H3V5zm4 0h14v2H7V5zM3 11h2v2H3v-2zm4 0h14v2H7v-2zM3 17h2v2H3v-2zm4 0h14v2H7v-2z" />
           </svg>
-          <p className="text-stone-600 dark:text-gray-400 mb-6">Scan a book's barcode to instantly look it up and add it to your library.</p>
+          <p className="text-stone-600 dark:text-gray-400 mb-6">Scan a book&apos;s barcode to instantly look it up and add it to your library.</p>
           <button onClick={startScanner} className="btn-primary px-6 py-3">Start Scanning</button>
 
           <div className="mt-8 pt-6 border-t border-stone-200 dark:border-gray-800">

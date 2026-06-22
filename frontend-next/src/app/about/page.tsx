@@ -38,7 +38,7 @@ export default function AboutPage() {
                 Goodreads is stuck in 2009
               </h3>
               <p className="leading-relaxed">
-                Cluttered UI, slow pages, and an interface that hasn't evolved with
+                Cluttered UI, slow pages, and an interface that hasn&apos;t evolved with
                 modern web standards. Readers deserve better.
               </p>
             </div>
@@ -48,9 +48,9 @@ export default function AboutPage() {
                 5-star ratings are broken
               </h3>
               <p className="leading-relaxed">
-                A single number can't capture the complexity of a reading experience.
+                A single number can&apos;t capture the complexity of a reading experience.
                 Was it fast-paced but shallow? Slow but emotionally devastating? 5
-                stars can't tell you.
+                stars can&apos;t tell you.
               </p>
             </div>
 
@@ -60,7 +60,7 @@ export default function AboutPage() {
               </h3>
               <p className="leading-relaxed">
                 Goodreads is owned by Amazon. Your reading history is valuable data
-                that's used for advertising and recommendations on other books to buy.
+                that&apos;s used for advertising and recommendations on other books to buy.
                 We believe your data should be yours.
               </p>
             </div>

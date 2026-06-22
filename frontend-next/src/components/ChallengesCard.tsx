@@ -24,7 +24,7 @@ export function ChallengesCard() {
   return (
     <div className="card p-5">
       <p className="font-serif font-semibold text-stone-900 dark:text-gray-100 mb-1">
-        This week's quests
+        This week&apos;s quests
       </p>
       <p className="text-xs text-stone-500 dark:text-gray-400 mb-4">
         Personal goals based on your own reading — never compared to anyone else.

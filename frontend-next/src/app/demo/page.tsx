@@ -92,7 +92,7 @@ export default function DemoPage() {
         {showRatingForm && (
           <div className="bg-white rounded-xl shadow-lg p-8 mb-8 border border-shelf-300 animate-slideUp">
             <h2 className="text-2xl font-bold text-gray-900 mb-6 font-serif">
-              Rate "{mockBook.title}"
+              Rate &quot;{mockBook.title}&quot;
             </h2>
             <MultiDimensionalRatingForm
               bookId={mockBook.id}
@@ -129,7 +129,7 @@ export default function DemoPage() {
               <div>
                 <h4 className="font-semibold mb-1">Create a Fingerprint</h4>
                 <p>
-                  Your ratings combine with others to create a unique "fingerprint"
+                  Your ratings combine with others to create a unique &quot;fingerprint&quot;
                   for each book, shown as a radar chart.
                 </p>
               </div>
@@ -140,7 +140,7 @@ export default function DemoPage() {
                 <h4 className="font-semibold mb-1">Discover Similar Books</h4>
                 <p>
                   Our algorithm finds books with similar fingerprints, enabling
-                  queries like "books like X but faster-paced."
+                  queries like &quot;books like X but faster-paced.&quot;
                 </p>
               </div>
             </div>
@@ -148,7 +148,7 @@ export default function DemoPage() {
 
           <div className="mt-6 pt-6 border-t border-purple-300">
             <p className="text-sm text-gray-600 italic">
-              💡 <strong>Pro tip:</strong> You don't need to rate every dimension. Rate
+              💡 <strong>Pro tip:</strong> You don&apos;t need to rate every dimension. Rate
               only what matters to you!
             </p>
           </div>
