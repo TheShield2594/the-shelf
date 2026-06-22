@@ -10,11 +10,16 @@ from ..models.user import User
 from ..models.user_book import UserBook
 from ..models.book import Book
 from ..schemas.library import UserBookCreate, UserBookUpdate, UserBookOut
-from ..schemas.book import ContentRatingAvg
 from ..auth import get_current_user
-from .books import _compute_book_stats, _compute_batch_stats
+from .books import _compute_book_stats, _compute_batch_stats, _book_to_summary
 
 router = APIRouter(prefix="/api/library", tags=["library"])
+
+
+def _user_book_to_out(ub: UserBook, avg_rating, rating_count, content_rating) -> UserBookOut:
+    return UserBookOut.model_validate(ub).model_copy(
+        update={"book": _book_to_summary(ub.book, avg_rating, rating_count, content_rating)}
+    )
 
 
 @router.get("", response_model=list[UserBookOut])
@@ -39,30 +44,10 @@ async def get_library(
     book_ids = [ub.book_id for ub in user_books]
     stats = await _compute_batch_stats(db, book_ids)
 
-    out = []
-    for ub in user_books:
-        avg_r, r_count, cr = stats.get(ub.book_id, (None, 0, None))
-        book_data = {
-            "id": ub.book.id,
-            "title": ub.book.title,
-            "author": ub.book.author,
-            "cover_url": ub.book.cover_url,
-            "genres": [{"id": g.id, "name": g.name} for g in ub.book.genres],
-            "avg_rating": avg_r,
-            "rating_count": r_count,
-            "content_rating": cr,
-        }
-        out.append({
-            "id": ub.id,
-            "book_id": ub.book_id,
-            "status": ub.status,
-            "rating": ub.rating,
-            "date_added": ub.date_added,
-            "date_started": ub.date_started,
-            "date_finished": ub.date_finished,
-            "book": book_data,
-        })
-    return out
+    return [
+        _user_book_to_out(ub, *stats.get(ub.book_id, (None, 0, None)))
+        for ub in user_books
+    ]
 
 
 @router.post("", response_model=UserBookOut, status_code=201)
@@ -100,25 +85,7 @@ async def add_to_library(
     )
     ub = result.scalar_one()
     avg_r, r_count, cr = await _compute_book_stats(db, ub.book_id)
-    return {
-        "id": ub.id,
-        "book_id": ub.book_id,
-        "status": ub.status,
-        "rating": ub.rating,
-        "date_added": ub.date_added,
-        "date_started": ub.date_started,
-        "date_finished": ub.date_finished,
-        "book": {
-            "id": ub.book.id,
-            "title": ub.book.title,
-            "author": ub.book.author,
-            "cover_url": ub.book.cover_url,
-            "genres": [{"id": g.id, "name": g.name} for g in ub.book.genres],
-            "avg_rating": avg_r,
-            "rating_count": r_count,
-            "content_rating": cr,
-        },
-    }
+    return _user_book_to_out(ub, avg_r, r_count, cr)
 
 
 @router.put("/{book_id}", response_model=UserBookOut)
@@ -151,25 +118,7 @@ async def update_library_entry(
     # No need to re-query — we already have the fully loaded object
     await db.refresh(ub)
     avg_r, r_count, cr = await _compute_book_stats(db, ub.book_id)
-    return {
-        "id": ub.id,
-        "book_id": ub.book_id,
-        "status": ub.status,
-        "rating": ub.rating,
-        "date_added": ub.date_added,
-        "date_started": ub.date_started,
-        "date_finished": ub.date_finished,
-        "book": {
-            "id": ub.book.id,
-            "title": ub.book.title,
-            "author": ub.book.author,
-            "cover_url": ub.book.cover_url,
-            "genres": [{"id": g.id, "name": g.name} for g in ub.book.genres],
-            "avg_rating": avg_r,
-            "rating_count": r_count,
-            "content_rating": cr,
-        },
-    }
+    return _user_book_to_out(ub, avg_r, r_count, cr)
 
 
 @router.delete("/{book_id}", status_code=204)

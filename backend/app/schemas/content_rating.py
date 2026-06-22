@@ -46,3 +46,8 @@ class ContentRatingOut(BaseModel):
     created_at: datetime.datetime
 
     model_config = {"from_attributes": True}
+
+    @field_validator("other_tags", mode="before")
+    @classmethod
+    def default_other_tags(cls, v: list[str] | None) -> list[str]:
+        return v or []

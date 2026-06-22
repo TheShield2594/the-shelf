@@ -23,12 +23,10 @@ from ..schemas.book import (
     BookOut,
     BookDetail,
     BookSummary,
-    RelatedBookOut,
-    ReviewOut,
     ContentRatingAvg,
     OpenLibraryImport,
 )
-from ..auth import get_current_user, get_current_user_optional
+from ..auth import get_current_admin_user, get_current_user_optional
 
 router = APIRouter(prefix="/api/books", tags=["books"])
 
@@ -550,22 +548,24 @@ async def _compute_batch_stats(db: AsyncSession, book_ids: list[int]) -> dict[in
     return result
 
 
-def _book_to_summary(book: Book, avg_rating, rating_count, content_rating) -> dict:
-    return {
-        "id": book.id,
-        "title": book.title,
-        "author": book.author,
-        "cover_url": book.cover_url,
-        "publication_date": book.publication_date,
-        "page_count": book.page_count,
-        "genres": [{"id": g.id, "name": g.name} for g in book.genres],
-        "avg_rating": avg_rating,
-        "rating_count": rating_count,
-        "external_rating": book.external_rating,
-        "external_rating_count": book.external_rating_count,
-        "buy_link": book.buy_link,
-        "content_rating": content_rating,
-    }
+def _book_to_summary(book: Book, avg_rating, rating_count, content_rating) -> BookSummary:
+    return BookSummary.model_validate(book).model_copy(
+        update={
+            "avg_rating": avg_rating,
+            "rating_count": rating_count,
+            "content_rating": content_rating,
+        }
+    )
+
+
+def _book_to_out(book: Book, avg_rating, rating_count, content_rating) -> BookOut:
+    return BookOut.model_validate(book).model_copy(
+        update={
+            "avg_rating": avg_rating,
+            "rating_count": rating_count,
+            "content_rating": content_rating,
+        }
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -647,53 +647,15 @@ async def get_book(book_id: int, db: AsyncSession = Depends(get_db)):
     )
     reviews = reviews_result.scalars().all()
 
-    return {
-        "id": book.id,
-        "title": book.title,
-        "author": book.author,
-        "author_bio": book.author_bio,
-        "isbn": book.isbn,
-        "description": book.description,
-        "cover_url": book.cover_url,
-        "publication_date": book.publication_date,
-        "page_count": book.page_count,
-        "created_at": book.created_at,
-        "genres": [{"id": g.id, "name": g.name} for g in book.genres],
-        "avg_rating": avg_r,
-        "rating_count": r_count,
-        "external_rating": book.external_rating,
-        "external_rating_count": book.external_rating_count,
-        "buy_link": book.buy_link,
-        "content_rating": cr,
-        "reviews": [
-            {
-                "id": r.id,
-                "user_id": r.user_id,
-                "username": r.user.username,
-                "book_id": r.book_id,
-                "review_text": r.review_text,
-                "created_at": r.created_at,
-                "updated_at": r.updated_at,
-            }
-            for r in reviews
-        ],
-        "related_books": [
-            {
-                "id": rb.id,
-                "title": rb.title,
-                "author": rb.author,
-                "cover_url": rb.cover_url,
-            }
-            for rb in book.related_to
-        ],
-    }
+    out = _book_to_out(book, avg_r, r_count, cr)
+    return BookDetail(**out.model_dump(), reviews=reviews, related_books=book.related_to)
 
 
 @router.post("", response_model=BookOut, status_code=201)
 async def create_book(
     data: BookCreate,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(get_current_user),
+    _user=Depends(get_current_admin_user),
 ):
     # Avoid creating duplicate catalog entries for a book that already exists,
     # which would let the same title be added to a shelf more than once under
@@ -709,13 +671,7 @@ async def create_book(
     existing = (await db.execute(existing_stmt)).scalars().first()
     if existing:
         avg_r, r_count, cr = await _compute_book_stats(db, existing.id)
-        return {
-            **existing.__dict__,
-            "genres": [{"id": g.id, "name": g.name} for g in existing.genres],
-            "avg_rating": avg_r,
-            "rating_count": r_count,
-            "content_rating": cr,
-        }
+        return _book_to_out(existing, avg_r, r_count, cr)
 
     book = Book(
         title=data.title,
@@ -733,13 +689,7 @@ async def create_book(
     await db.commit()
     await db.refresh(book)
     avg_r, r_count, cr = await _compute_book_stats(db, book.id)
-    return {
-        **book.__dict__,
-        "genres": [{"id": g.id, "name": g.name} for g in book.genres],
-        "avg_rating": avg_r,
-        "rating_count": r_count,
-        "content_rating": cr,
-    }
+    return _book_to_out(book, avg_r, r_count, cr)
 
 
 @router.put("/{book_id}", response_model=BookOut)
@@ -747,7 +697,7 @@ async def update_book(
     book_id: int,
     data: BookUpdate,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(get_current_user),
+    _user=Depends(get_current_admin_user),
 ):
     result = await db.execute(
         select(Book).options(selectinload(Book.genres)).where(Book.id == book_id)
@@ -766,20 +716,14 @@ async def update_book(
     await db.commit()
     await db.refresh(book)
     avg_r, r_count, cr = await _compute_book_stats(db, book.id)
-    return {
-        **book.__dict__,
-        "genres": [{"id": g.id, "name": g.name} for g in book.genres],
-        "avg_rating": avg_r,
-        "rating_count": r_count,
-        "content_rating": cr,
-    }
+    return _book_to_out(book, avg_r, r_count, cr)
 
 
 @router.delete("/{book_id}", status_code=204)
 async def delete_book(
     book_id: int,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(get_current_user),
+    _user=Depends(get_current_admin_user),
 ):
     result = await db.execute(select(Book).where(Book.id == book_id))
     book = result.scalar_one_or_none()
@@ -794,7 +738,7 @@ async def add_related_book(
     book_id: int,
     related_id: int,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(get_current_user),
+    _user=Depends(get_current_admin_user),
 ):
     if book_id == related_id:
         raise HTTPException(
@@ -819,7 +763,7 @@ async def remove_related_book(
     book_id: int,
     related_id: int,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(get_current_user),
+    _user=Depends(get_current_admin_user),
 ):
     result = await db.execute(
         select(RelatedBook).where(
@@ -846,7 +790,7 @@ async def remove_related_book(
 async def import_from_open_library(
     data: OpenLibraryImport,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(get_current_user),
+    _user=Depends(get_current_admin_user),
 ):
     clean_isbn = data.query.replace("-", "").replace(" ", "") if data.isbn else None
 
@@ -929,10 +873,4 @@ async def import_from_open_library(
     db.add(book)
     await db.commit()
     await db.refresh(book)
-    return {
-        **book.__dict__,
-        "genres": [{"id": g.id, "name": g.name} for g in book.genres],
-        "avg_rating": None,
-        "rating_count": 0,
-        "content_rating": None,
-    }
+    return _book_to_out(book, None, 0, None)
