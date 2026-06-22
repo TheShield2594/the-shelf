@@ -1,3 +1,6 @@
+from urllib.parse import parse_qs, urlparse
+
+
 async def register(client, username="alice", email="alice@example.com", password="hunter2pass"):
     return await client.post(
         "/api/auth/register",
@@ -138,7 +141,7 @@ async def test_forgot_password_then_reset(client, monkeypatch):
     assert response.status_code == 202
     assert captured["to_email"] == "alice@example.com"
 
-    token = captured["reset_link"].split("token=")[1]
+    token = parse_qs(urlparse(captured["reset_link"]).query)["token"][0]
     response = await client.post(
         "/api/auth/reset-password",
         json={"token": token, "new_password": "brand-new-pass"},
@@ -184,7 +187,7 @@ async def test_reset_password_token_cannot_be_reused(client, monkeypatch):
     monkeypatch.setattr("app.routers.auth.send_password_reset_email", fake_send)
 
     await client.post("/api/auth/forgot-password", json={"email": "alice@example.com"})
-    token = captured["reset_link"].split("token=")[1]
+    token = parse_qs(urlparse(captured["reset_link"]).query)["token"][0]
 
     response = await client.post(
         "/api/auth/reset-password",

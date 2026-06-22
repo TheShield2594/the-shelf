@@ -32,7 +32,7 @@ export default function ForgotPasswordPage() {
         {submitted ? (
           <p className="text-center text-sm text-stone-600 dark:text-gray-400">
             If an account with that email exists, we&apos;ve sent a link to reset your
-            password. The link expires in 30 minutes.
+            password. The link expires soon.
           </p>
         ) : (
           <>

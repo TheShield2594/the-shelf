@@ -39,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Version History
 
 ### [0.2.0]
+
 - Multi-dimensional (7-axis) rating system with book fingerprints and radar
   charts, replacing 5-star ratings as the primary rating mechanism
 - Migrated frontend from Vite/React to Next.js (`frontend-next/`)
@@ -46,6 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dark mode
 
 ### [0.1.0] - Initial implementation
+
 - Basic book tracking (want-to-read, currently reading, finished, DNF)
 - 5-star ratings
 - Review system

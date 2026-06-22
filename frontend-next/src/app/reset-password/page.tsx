@@ -61,16 +61,22 @@ function ResetPasswordForm() {
         </div>
       )}
       <div>
-        <label className="block text-sm font-medium text-stone-700 dark:text-gray-300 mb-1">
+        <label
+          htmlFor="new-password"
+          className="block text-sm font-medium text-stone-700 dark:text-gray-300 mb-1"
+        >
           New password
         </label>
         <input
+          id="new-password"
+          name="newPassword"
           type="password"
           value={newPassword}
           onChange={(e) => setNewPassword(e.target.value)}
           className="input"
           required
           minLength={6}
+          autoComplete="new-password"
           autoFocus
         />
       </div>

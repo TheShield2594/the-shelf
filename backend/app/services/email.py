@@ -10,11 +10,7 @@ logger = logging.getLogger(__name__)
 
 async def send_password_reset_email(to_email: str, reset_link: str) -> None:
     if not settings.smtp_host:
-        logger.warning(
-            "SMTP not configured; skipping password reset email to %s. Reset link: %s",
-            to_email,
-            reset_link,
-        )
+        logger.warning("SMTP not configured; skipping password reset email delivery")
         return
 
     message = EmailMessage()

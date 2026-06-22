@@ -24,6 +24,13 @@ class Settings(BaseSettings):
 
     model_config = {"env_file": ".env"}
 
+    @field_validator("password_reset_expire_minutes")
+    @classmethod
+    def _validate_password_reset_expire_minutes(cls, value: int) -> int:
+        if value <= 0:
+            raise ValueError("PASSWORD_RESET_EXPIRE_MINUTES must be greater than 0")
+        return value
+
     @field_validator("cors_origins")
     @classmethod
     def _normalize_cors_origins(cls, value: str) -> str:

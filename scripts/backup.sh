@@ -28,7 +28,7 @@ POSTGRES_DB="${POSTGRES_DB:-the_shelf}"
 OUT_FILE="$BACKUP_DIR/the-shelf-${TIMESTAMP}.sql.gz"
 
 echo "Backing up database '$POSTGRES_DB' to $OUT_FILE ..."
-docker compose exec -T db pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB" | gzip > "$OUT_FILE"
+docker compose exec -T db pg_dump --clean --if-exists -U "$POSTGRES_USER" "$POSTGRES_DB" | gzip > "$OUT_FILE"
 
 echo "Backup written: $OUT_FILE ($(du -h "$OUT_FILE" | cut -f1))"
 

@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -32,6 +34,7 @@ from ..auth import (
 )
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+logger = logging.getLogger(__name__)
 
 
 @router.post("/register", response_model=UserOut, status_code=201)
@@ -144,7 +147,12 @@ async def forgot_password(
     if user:
         token = create_password_reset_token(user)
         reset_link = f"{settings.frontend_base_url}/reset-password?token={token}"
-        await send_password_reset_email(user.email, reset_link)
+        try:
+            await send_password_reset_email(user.email, reset_link)
+        except Exception:
+            # Keep the response uniform regardless of delivery failures, so this
+            # endpoint can't be used to distinguish valid from invalid emails.
+            logger.exception("Failed to send password reset email")
     # Always respond the same way regardless of whether the email exists,
     # so this endpoint can't be used to enumerate registered accounts.
 

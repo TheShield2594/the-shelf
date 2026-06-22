@@ -7,6 +7,12 @@ os.environ.setdefault(
 )
 os.environ.setdefault("CORS_ORIGINS", "http://localhost:3000")
 
+_db_name = os.environ["DATABASE_URL"].rsplit("/", 1)[-1]
+if "test" not in _db_name:
+    raise RuntimeError(
+        f"Refusing to run tests against non-test database: {_db_name!r}"
+    )
+
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine

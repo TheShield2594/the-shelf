@@ -30,6 +30,6 @@ if [[ "$CONFIRM" != "y" && "$CONFIRM" != "Y" ]]; then
 fi
 
 echo "Restoring $BACKUP_FILE into '$POSTGRES_DB' ..."
-gunzip -c "$BACKUP_FILE" | docker compose exec -T db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+gunzip -c "$BACKUP_FILE" | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"
 
 echo "Restore complete."
