@@ -21,24 +21,6 @@ pip install -r requirements.txt
 alembic upgrade head
 ```
 
-### Enable pgvector Extension
-
-Before running migrations, enable the pgvector extension in PostgreSQL:
-
-```bash
-# Connect to your database
-psql -U your_user -d the_shelf
-
-# Enable extension
-CREATE EXTENSION IF NOT EXISTS vector;
-```
-
-Or via SQL migration (Alembic will handle this):
-
-```sql
-CREATE EXTENSION IF NOT EXISTS vector;
-```
-
 ## Creating Migrations
 
 ### Auto-generate Migration from Model Changes
@@ -105,8 +87,11 @@ alembic history --verbose
 The first major migration adds:
 1. `multi_dimensional_ratings` table (7-axis rating system)
 2. `book_fingerprints` table (aggregated ratings)
-3. pgvector extension for similarity search
-4. Relationships between existing tables
+3. Relationships between existing tables
+
+Fingerprint similarity is computed in Python (see `fingerprint_vector` on
+`BookFingerprint`/`MultiDimensionalRating`); there's no pgvector column or
+extension involved in the current schema.
 
 **To create this migration:**
 
@@ -116,10 +101,9 @@ alembic revision --autogenerate -m "Add multi-dimensional ratings and fingerprin
 ```
 
 **Review the generated migration file** in `backend/alembic/versions/` to ensure:
-- pgvector extension is created
 - All CHECK constraints are present
 - Foreign key relationships are correct
-- Indexes are created (especially for vector columns)
+- Indexes are created where needed
 
 **Apply the migration:**
 
@@ -156,21 +140,6 @@ alembic upgrade head
 ```
 
 ## Common Issues
-
-### Issue: "pgvector extension not found"
-
-**Solution:**
-```bash
-# Install pgvector on your system
-# Ubuntu/Debian:
-sudo apt install postgresql-15-pgvector
-
-# Or compile from source:
-git clone https://github.com/pgvector/pgvector.git
-cd pgvector
-make
-sudo make install
-```
 
 ### Issue: "target database is not up to date"
 
@@ -288,8 +257,8 @@ async def recalculate_fingerprints():
 When deploying to production:
 
 ```bash
-# 1. Backup database
-pg_dump the_shelf > backup_$(date +%Y%m%d).sql
+# 1. Backup database (see scripts/backup.sh for the docker-compose setup)
+./scripts/backup.sh
 
 # 2. Run migrations
 alembic upgrade head
@@ -303,7 +272,7 @@ alembic current
 # 5. If issues, rollback
 alembic downgrade -1
 # Restore from backup if needed
-psql the_shelf < backup_20250213.sql
+./scripts/restore.sh backups/the-shelf-<timestamp>.sql.gz
 ```
 
 ## Docker / docker-compose Deployment
@@ -368,5 +337,4 @@ jobs:
 
 For questions or issues, refer to:
 - [Alembic Documentation](https://alembic.sqlalchemy.org/en/latest/)
-- [pgvector Documentation](https://github.com/pgvector/pgvector)
-- [ARCHITECTURE.md](./ARCHITECTURE.md) for schema details
+- `backend/app/models/` for the current schema

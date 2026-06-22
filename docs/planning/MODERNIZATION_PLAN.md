@@ -1,5 +1,10 @@
 # UI/UX Modernization Plan - The Shelf
 
+> **Historical planning document.** Written against the older Vite-based
+> React frontend before the migration to `frontend-next/` (Next.js), which
+> already ships dark mode, a component library, and most items this plan
+> called for. Kept for historical context only.
+
 ## Executive Summary
 
 This document outlines the incremental modernization strategy for The Shelf's frontend, transforming it from a functional but basic UI into a polished, modern book discovery platform while preserving all existing functionality and API contracts.

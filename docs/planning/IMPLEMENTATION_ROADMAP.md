@@ -1,5 +1,10 @@
 # The Shelf - Implementation Roadmap
 
+> **Historical planning document.** This roadmap targets the vision in
+> `PRODUCT_VISION.md`/`ARCHITECTURE.md`, parts of which were never built or
+> were since changed. It does not reflect the current state of the repo —
+> see [README.md](../../README.md) instead.
+
 This document provides a step-by-step guide for implementing The Shelf from the current POC to the full vision outlined in [PRODUCT_VISION.md](PRODUCT_VISION.md) and [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ---

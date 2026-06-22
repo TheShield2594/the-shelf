@@ -1,5 +1,10 @@
 # The Shelf - Quick Start Guide
 
+> **Superseded.** This guide predates the current cookie-based auth and the
+> removal of pgvector/embeddings, so some steps and curl examples below are
+> no longer accurate. See [README.md](../../README.md) for the current
+> setup instructions.
+
 Get The Shelf running locally in 5 minutes.
 
 ---

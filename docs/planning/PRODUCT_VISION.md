@@ -1,5 +1,10 @@
 # The Shelf - Product Vision
 
+> **Historical planning document.** Early strategic/product thinking that
+> shaped the project's direction. Some of it (monetization plans, future
+> feature ideas) was never built and may no longer be the plan. See
+> [README.md](../../README.md) for what the app actually does today.
+
 ## Executive Summary
 
 **The Shelf** is a privacy-first, algorithmically intelligent book platform that respects readers' time, intelligence, and data. We reject the engagement-maximization playbook of social media and instead build for genuine book discovery, thoughtful reflection, and meaningful connections.

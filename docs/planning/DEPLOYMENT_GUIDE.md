@@ -1,5 +1,11 @@
 # The Shelf - Deployment Guide
 
+> **Historical/untested planning document.** Describes a hypothetical
+> Railway + Neon + pgvector deployment that was never actually built or
+> verified, and references a pgvector setup the app no longer uses. The
+> supported, tested deployment path is Docker Compose — see the "Quick
+> Start" and "Backups" sections in [README.md](../../README.md).
+
 This guide covers deploying The Shelf to production using modern hosting platforms.
 
 ---

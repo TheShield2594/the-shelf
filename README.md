@@ -44,6 +44,30 @@ A self-hostable, privacy-first book and reading tracker. Track your books, scan 
 3. Add environment variables from `.env.example` under the **Env** tab
 4. Deploy the stack
 
+## Backups
+
+The `db` service stores all data in the `pgdata` Docker volume. Back it up
+regularly, since the volume alone is not portable across hosts and offers no
+point-in-time recovery.
+
+```bash
+# Create a one-off backup (writes to ./backups/the-shelf-<timestamp>.sql.gz)
+./scripts/backup.sh
+
+# Restore from a backup (overwrites all current data)
+./scripts/restore.sh backups/the-shelf-20260101T030000Z.sql.gz
+```
+
+To back up automatically, add a cron entry on the host running Docker Compose:
+
+```cron
+0 3 * * * cd /path/to/the-shelf && ./scripts/backup.sh >> backups/backup.log 2>&1
+```
+
+Backups older than `BACKUP_RETENTION_DAYS` (default 14) are pruned
+automatically. Copy the `backups/` directory off-host (e.g. to object storage)
+for protection against full host loss.
+
 ## Development
 
 ### Backend (FastAPI)
@@ -99,12 +123,21 @@ the-shelf/
 │   ├── public/        # PWA assets, icons
 │   ├── Dockerfile
 │   └── package.json
+├── scripts/           # Backup/restore helper scripts
 ├── docker-compose.yml
 ├── .env.example
 └── README.md
 ```
 
 > **Note:** The `frontend/` directory contains an older Vite-based frontend and is deprecated. Use `frontend-next/` for all development.
+
+## Documentation
+
+- [CHANGELOG.md](CHANGELOG.md) — notable changes
+- [DATABASE_MIGRATION_GUIDE.md](DATABASE_MIGRATION_GUIDE.md) — Alembic workflow
+- [CONTENT_RATINGS.md](CONTENT_RATINGS.md) — community content rating system
+- [MULTI_DIMENSIONAL_RATINGS.md](MULTI_DIMENSIONAL_RATINGS.md) — the 7-axis rating system
+- [docs/planning/](docs/planning/) — early product/architecture planning docs, kept for historical context; several describe features that were never built or have since changed
 
 ## License
 

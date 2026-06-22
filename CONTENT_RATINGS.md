@@ -168,4 +168,6 @@ Users are encouraged to:
 
 ---
 
-**Note**: If your organization has access to Common Sense Media API, see [CSM_INTEGRATION.md](./CSM_INTEGRATION.md) for integration instructions. The community system will work alongside professional ratings.
+**Note**: Common Sense Media API integration was never built; see
+[docs/planning/CSM_INTEGRATION.md](./docs/planning/CSM_INTEGRATION.md) for
+the (unimplemented) design if you want to add it.

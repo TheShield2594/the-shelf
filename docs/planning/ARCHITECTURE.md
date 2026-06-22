@@ -1,5 +1,12 @@
 # The Shelf - System Architecture
 
+> **Historical planning document.** This describes a target architecture
+> from early planning, including pgvector/embeddings-based recommendations
+> that were never built (or were since stubbed out) to keep the Docker
+> image lightweight — see `backend/app/services/embeddings.py`. It does not
+> reflect the current implementation. See [README.md](../../README.md) for
+> the actual stack.
+
 ## Architecture Overview
 
 ### High-Level Architecture
