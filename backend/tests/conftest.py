@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 import app.models  # noqa: F401  registers all tables on Base.metadata
 from app.database import Base, get_db
 from app.main import app
+from app.rate_limit import limiter
 
 TEST_DATABASE_URL = os.environ["DATABASE_URL"]
 
@@ -43,6 +44,7 @@ async def db_session():
 
 @pytest_asyncio.fixture
 async def client(db_session):
+    limiter.reset()
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac

@@ -11,6 +11,17 @@ class Settings(BaseSettings):
     google_books_api_key: str | None = None
     cookie_secure: bool = False
 
+    # Password reset email. If smtp_host is unset, password reset requests
+    # are accepted but no email is sent (logged server-side instead).
+    smtp_host: str | None = None
+    smtp_port: int = 587
+    smtp_user: str | None = None
+    smtp_password: str | None = None
+    smtp_from: str = "no-reply@the-shelf.local"
+    smtp_use_tls: bool = True
+    frontend_base_url: str = "http://localhost:3000"
+    password_reset_expire_minutes: int = 30
+
     model_config = {"env_file": ".env"}
 
     @field_validator("cors_origins")

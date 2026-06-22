@@ -1,16 +1,31 @@
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..config import settings
 from ..database import get_db
 from ..models.user import User
 from ..models.user_book import UserBook
 from ..models.review import Review
-from ..schemas.user import UserCreate, UserLogin, UserOut, UserProfile, PasswordChange, EmailChange
+from ..rate_limit import limiter
+from ..schemas.user import (
+    UserCreate,
+    UserLogin,
+    UserOut,
+    UserProfile,
+    PasswordChange,
+    EmailChange,
+    PasswordResetRequest,
+    PasswordResetConfirm,
+)
+from ..services.email import send_password_reset_email
 from ..auth import (
     hash_password,
     verify_password,
     create_access_token,
+    create_password_reset_token,
+    decode_password_reset_token,
+    password_fingerprint,
     get_current_user,
     set_auth_cookie,
     clear_auth_cookie,
@@ -20,7 +35,8 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
 @router.post("/register", response_model=UserOut, status_code=201)
-async def register(data: UserCreate, db: AsyncSession = Depends(get_db)):
+@limiter.limit("5/hour")
+async def register(request: Request, data: UserCreate, db: AsyncSession = Depends(get_db)):
     existing = await db.execute(
         select(User).where((User.username == data.username) | (User.email == data.email))
     )
@@ -39,7 +55,10 @@ async def register(data: UserCreate, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/login", response_model=UserOut)
-async def login(data: UserLogin, response: Response, db: AsyncSession = Depends(get_db)):
+@limiter.limit("10/minute")
+async def login(
+    request: Request, data: UserLogin, response: Response, db: AsyncSession = Depends(get_db)
+):
     result = await db.execute(select(User).where(User.username == data.username))
     user = result.scalar_one_or_none()
     if not user or not verify_password(data.password, user.password_hash):
@@ -113,3 +132,35 @@ async def change_email(
     await db.commit()
     await db.refresh(user)
     return user
+
+
+@router.post("/forgot-password", status_code=202)
+@limiter.limit("3/hour")
+async def forgot_password(
+    request: Request, data: PasswordResetRequest, db: AsyncSession = Depends(get_db)
+):
+    result = await db.execute(select(User).where(User.email == data.email))
+    user = result.scalar_one_or_none()
+    if user:
+        token = create_password_reset_token(user)
+        reset_link = f"{settings.frontend_base_url}/reset-password?token={token}"
+        await send_password_reset_email(user.email, reset_link)
+    # Always respond the same way regardless of whether the email exists,
+    # so this endpoint can't be used to enumerate registered accounts.
+
+
+@router.post("/reset-password", status_code=204)
+@limiter.limit("10/hour")
+async def reset_password(
+    request: Request, data: PasswordResetConfirm, db: AsyncSession = Depends(get_db)
+):
+    payload = decode_password_reset_token(data.token)
+    if payload is None:
+        raise HTTPException(status_code=400, detail="Invalid or expired token")
+
+    user = await db.get(User, int(payload["sub"]))
+    if user is None or password_fingerprint(user.password_hash) != payload.get("pwh"):
+        raise HTTPException(status_code=400, detail="Invalid or expired token")
+
+    user.password_hash = hash_password(data.new_password)
+    await db.commit()

@@ -11,3 +11,5 @@ httpx==0.28.1
 python-multipart==0.0.19
 pydantic-settings==2.7.0
 orjson==3.10.12
+slowapi==0.1.10
+aiosmtplib==5.1.2

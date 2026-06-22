@@ -59,6 +59,14 @@ export default function LoginPage() {
               className="input"
               required
             />
+            <div className="text-right mt-1">
+              <Link
+                href="/forgot-password"
+                className="text-xs text-shelf-600 dark:text-shelf-500 hover:underline"
+              >
+                Forgot password?
+              </Link>
+            </div>
           </div>
           <button type="submit" disabled={submitting} className="btn-primary w-full">
             {submitting ? 'Logging in...' : 'Login'}

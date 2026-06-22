@@ -111,3 +111,89 @@ async def test_change_email_to_taken_address_rejected(client):
         json={"new_email": "bob@example.com", "current_password": "hunter2pass"},
     )
     assert response.status_code == 400
+
+
+async def test_login_rate_limited_after_repeated_attempts(client):
+    await register(client)
+    for _ in range(10):
+        await login(client, password="wrong-password")
+    response = await login(client, password="wrong-password")
+    assert response.status_code == 429
+
+
+async def test_forgot_password_then_reset(client, monkeypatch):
+    await register(client, username="alice", email="alice@example.com")
+
+    captured = {}
+
+    async def fake_send(to_email, reset_link):
+        captured["to_email"] = to_email
+        captured["reset_link"] = reset_link
+
+    monkeypatch.setattr("app.routers.auth.send_password_reset_email", fake_send)
+
+    response = await client.post(
+        "/api/auth/forgot-password", json={"email": "alice@example.com"}
+    )
+    assert response.status_code == 202
+    assert captured["to_email"] == "alice@example.com"
+
+    token = captured["reset_link"].split("token=")[1]
+    response = await client.post(
+        "/api/auth/reset-password",
+        json={"token": token, "new_password": "brand-new-pass"},
+    )
+    assert response.status_code == 204
+
+    response = await login(client, username="alice", password="brand-new-pass")
+    assert response.status_code == 200
+
+
+async def test_forgot_password_unknown_email_does_not_leak_existence(client, monkeypatch):
+    called = False
+
+    async def fake_send(to_email, reset_link):
+        nonlocal called
+        called = True
+
+    monkeypatch.setattr("app.routers.auth.send_password_reset_email", fake_send)
+
+    response = await client.post(
+        "/api/auth/forgot-password", json={"email": "ghost@example.com"}
+    )
+    assert response.status_code == 202
+    assert called is False
+
+
+async def test_reset_password_with_garbage_token_rejected(client):
+    response = await client.post(
+        "/api/auth/reset-password",
+        json={"token": "not-a-real-token", "new_password": "whatever123"},
+    )
+    assert response.status_code == 400
+
+
+async def test_reset_password_token_cannot_be_reused(client, monkeypatch):
+    await register(client, username="alice", email="alice@example.com")
+
+    captured = {}
+
+    async def fake_send(to_email, reset_link):
+        captured["reset_link"] = reset_link
+
+    monkeypatch.setattr("app.routers.auth.send_password_reset_email", fake_send)
+
+    await client.post("/api/auth/forgot-password", json={"email": "alice@example.com"})
+    token = captured["reset_link"].split("token=")[1]
+
+    response = await client.post(
+        "/api/auth/reset-password",
+        json={"token": token, "new_password": "first-new-pass"},
+    )
+    assert response.status_code == 204
+
+    response = await client.post(
+        "/api/auth/reset-password",
+        json={"token": token, "new_password": "second-new-pass"},
+    )
+    assert response.status_code == 400
