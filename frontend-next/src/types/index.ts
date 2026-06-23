@@ -162,6 +162,29 @@ export interface ISBNDetailLookupResult {
   book: BookSummary;
 }
 
+export interface TrendingBook {
+  title: string;
+  author: string;
+  isbn?: string;
+  cover_url?: string;
+  description?: string;
+  buy_link?: string;
+  rank: number;
+  weeks_on_list: number;
+  book_id?: number;
+}
+
+export interface TrendingList {
+  list_name: string;
+  display_name: string;
+  books: TrendingBook[];
+}
+
+export interface TrendingResponse {
+  enabled: boolean;
+  lists: TrendingList[];
+}
+
 // Gamification (private, self-referential - see PRODUCT_VISION.md)
 export interface BadgeOut {
   code: string;

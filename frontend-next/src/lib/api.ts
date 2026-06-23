@@ -18,6 +18,7 @@ import type {
   ReadingSessionOut,
   LogSessionResponse,
   ChallengeOut,
+  TrendingResponse,
 } from '@/types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
@@ -202,6 +203,10 @@ class APIClient {
 
   async searchExternal(q: string, limit = 10): Promise<BookSummary[]> {
     return this.request<BookSummary[]>(`/api/books/search-external?q=${encodeURIComponent(q)}&limit=${limit}`);
+  }
+
+  async getTrending(): Promise<TrendingResponse> {
+    return this.request<TrendingResponse>('/api/books/trending');
   }
 
   // Library
