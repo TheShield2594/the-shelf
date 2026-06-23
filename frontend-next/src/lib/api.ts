@@ -19,6 +19,7 @@ import type {
   LogSessionResponse,
   ChallengeOut,
   TrendingResponse,
+  Recommendation,
 } from '@/types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
@@ -207,6 +208,10 @@ class APIClient {
 
   async getTrending(): Promise<TrendingResponse> {
     return this.request<TrendingResponse>('/api/books/trending');
+  }
+
+  async getRecommendations(): Promise<Recommendation[]> {
+    return this.request<Recommendation[]>('/api/books/recommendations');
   }
 
   // Library

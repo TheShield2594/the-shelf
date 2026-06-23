@@ -185,6 +185,11 @@ export interface TrendingResponse {
   lists: TrendingList[];
 }
 
+export interface Recommendation {
+  book: BookSummary;
+  reason: string;
+}
+
 // Gamification (private, self-referential - see PRODUCT_VISION.md)
 export interface BadgeOut {
   code: string;

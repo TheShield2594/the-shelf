@@ -26,9 +26,11 @@ from ..schemas.book import (
     BookSummary,
     ContentRatingAvg,
     OpenLibraryImport,
+    RecommendationOut,
 )
 from ..schemas.trending import TrendingBookOut, TrendingListOut, TrendingResponse
-from ..auth import get_current_admin_user, get_current_user_optional
+from ..services.recommendations import get_recommendations_for_user
+from ..auth import get_current_admin_user, get_current_user, get_current_user_optional
 
 router = APIRouter(prefix="/api/books", tags=["books"])
 
@@ -509,6 +511,36 @@ async def get_trending(db: AsyncSession = Depends(get_db)):
         )
 
     return TrendingResponse(enabled=True, lists=out_lists)
+
+
+# ---------------------------------------------------------------------------
+# Recommendations — personalized, based on the user's own finished+rated books
+# ---------------------------------------------------------------------------
+
+
+@router.get("/recommendations", response_model=list[RecommendationOut])
+async def get_recommendations(
+    limit: int = Query(12, le=50),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Books similar to what the current user has finished and rated highly.
+
+    Returns an empty list rather than erroring if the user hasn't rated
+    enough books yet — there's simply nothing to base suggestions on.
+    """
+    results = await get_recommendations_for_user(db, current_user.id, limit=limit)
+
+    book_ids = [book.id for book, _ in results]
+    stats = await _compute_batch_stats(db, book_ids)
+
+    return [
+        RecommendationOut(
+            book=_book_to_summary(book, *stats.get(book.id, (None, 0, None))),
+            reason=reason,
+        )
+        for book, reason in results
+    ]
 
 
 # ---------------------------------------------------------------------------

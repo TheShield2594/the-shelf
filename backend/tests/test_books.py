@@ -2,7 +2,10 @@ from sqlalchemy import select
 
 from app.config import settings
 from app.models.book import Book
+from app.models.genre import Genre
+from app.models.multi_dimensional_rating import BookFingerprint, MultiDimensionalRating
 from app.models.user import User
+from app.models.user_book import ReadingStatus, UserBook
 from tests.test_auth import login, register
 
 NYT_OVERVIEW_FIXTURE = {
@@ -144,3 +147,163 @@ async def test_trending_returns_curated_lists_and_matches_local_books(
     assert dune["title"] == "Dune"
     assert dune["book_id"] is not None
     assert dune["cover_url"] is None  # empty string from NYT normalized to None
+
+
+async def _get_user_id(db_session, username="alice") -> int:
+    result = await db_session.execute(select(User.id).where(User.username == username))
+    return result.scalar_one()
+
+
+async def test_recommendations_requires_auth(client):
+    response = await client.get("/api/books/recommendations")
+    assert response.status_code == 401
+
+
+async def test_recommendations_empty_without_highly_rated_finished_books(client, db_session):
+    await register(client)
+    await login(client)
+    user_id = await _get_user_id(db_session)
+
+    book = Book(title="Dune", author="Frank Herbert")
+    db_session.add(book)
+    await db_session.flush()
+    db_session.add(UserBook(user_id=user_id, book_id=book.id, status=ReadingStatus.WANT_TO_READ))
+    await db_session.commit()
+
+    response = await client.get("/api/books/recommendations")
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+async def test_recommendations_suggests_unread_book_sharing_genre_with_loved_book(
+    client, db_session
+):
+    await register(client)
+    await login(client)
+    user_id = await _get_user_id(db_session)
+
+    scifi = Genre(name="Sci-Fi")
+    db_session.add(scifi)
+    await db_session.flush()
+
+    loved = Book(title="Dune", author="Frank Herbert", genres=[scifi])
+    candidate = Book(title="Hyperion", author="Dan Simmons", genres=[scifi])
+    unrelated = Book(title="Romance Novel", author="Someone Else")
+    db_session.add_all([loved, candidate, unrelated])
+    await db_session.flush()
+
+    db_session.add(
+        UserBook(user_id=user_id, book_id=loved.id, status=ReadingStatus.FINISHED, rating=5)
+    )
+    await db_session.commit()
+
+    response = await client.get("/api/books/recommendations")
+    assert response.status_code == 200
+    body = response.json()
+
+    titles = [rec["book"]["title"] for rec in body]
+    assert "Hyperion" in titles
+    assert "Romance Novel" not in titles  # no genre overlap with the loved book
+    assert "Dune" not in titles  # already in the user's library
+
+    hyperion = next(rec for rec in body if rec["book"]["title"] == "Hyperion")
+    assert hyperion["reason"] == "Because you enjoyed Dune"
+
+
+async def test_recommendations_excludes_books_already_in_library(client, db_session):
+    await register(client)
+    await login(client)
+    user_id = await _get_user_id(db_session)
+
+    scifi = Genre(name="Sci-Fi")
+    db_session.add(scifi)
+    await db_session.flush()
+
+    loved = Book(title="Dune", author="Frank Herbert", genres=[scifi])
+    already_owned = Book(title="Hyperion", author="Dan Simmons", genres=[scifi])
+    db_session.add_all([loved, already_owned])
+    await db_session.flush()
+
+    db_session.add_all(
+        [
+            UserBook(user_id=user_id, book_id=loved.id, status=ReadingStatus.FINISHED, rating=5),
+            UserBook(
+                user_id=user_id,
+                book_id=already_owned.id,
+                status=ReadingStatus.WANT_TO_READ,
+            ),
+        ]
+    )
+    await db_session.commit()
+
+    response = await client.get("/api/books/recommendations")
+    assert response.status_code == 200
+    titles = [rec["book"]["title"] for rec in response.json()]
+    assert "Hyperion" not in titles
+
+
+async def test_recommendations_matches_on_fingerprint_similarity_without_genre_overlap(
+    client, db_session
+):
+    await register(client)
+    await login(client)
+    user_id = await _get_user_id(db_session)
+
+    loved = Book(title="Dune", author="Frank Herbert")
+    candidate = Book(title="Hyperion", author="Dan Simmons")
+    unrelated = Book(title="Cozy Slow Read", author="Someone Else")
+    db_session.add_all([loved, candidate, unrelated])
+    await db_session.flush()
+
+    db_session.add(UserBook(user_id=user_id, book_id=loved.id, status=ReadingStatus.FINISHED))
+    db_session.add(
+        MultiDimensionalRating(
+            user_id=user_id,
+            book_id=loved.id,
+            pace=5,
+            emotional_impact=5,
+            complexity=5,
+            character_development=5,
+            plot_quality=5,
+            prose_style=5,
+            originality=5,
+        )
+    )
+    # Pretend other users have rated these so each has an aggregate fingerprint,
+    # without using update_book_fingerprint() (that's covered by the ratings
+    # router tests) — write the aggregate rows directly.
+    db_session.add(
+        BookFingerprint(
+            book_id=candidate.id,
+            avg_pace=5,
+            avg_emotional_impact=5,
+            avg_complexity=5,
+            avg_character_development=5,
+            avg_plot_quality=5,
+            avg_prose_style=5,
+            avg_originality=5,
+            star_equivalent=5,
+            total_ratings=1,
+        )
+    )
+    db_session.add(
+        BookFingerprint(
+            book_id=unrelated.id,
+            avg_pace=1,
+            avg_emotional_impact=1,
+            avg_complexity=1,
+            avg_character_development=1,
+            avg_plot_quality=1,
+            avg_prose_style=1,
+            avg_originality=1,
+            star_equivalent=1,
+            total_ratings=1,
+        )
+    )
+    await db_session.commit()
+
+    response = await client.get("/api/books/recommendations")
+    assert response.status_code == 200
+    titles = [rec["book"]["title"] for rec in response.json()]
+    assert "Hyperion" in titles
+    assert "Cozy Slow Read" not in titles
