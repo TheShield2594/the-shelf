@@ -412,9 +412,10 @@ async def search_external(
 # Trending — NYT Best Sellers (optional; requires NYT_BOOKS_API_KEY)
 # ---------------------------------------------------------------------------
 
-# NYT bestseller lists only refresh weekly, and the free API tier is capped
-# at 5 requests/minute and 500/day, so the raw overview response is cached
-# in-process well past any plausible page-load frequency.
+# NYT bestseller lists only update weekly, and the Books API is capped at
+# 1,000 requests/day (per https://github.com/nytimes/public_api_specs), so
+# the raw overview response is cached in-process well past any plausible
+# page-load frequency.
 _NYT_CACHE_TTL_SECONDS = 6 * 60 * 60
 _nyt_cache: dict | None = None
 _nyt_cache_time: float = 0.0
