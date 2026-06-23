@@ -138,9 +138,11 @@ async def test_resolve_twice_reports_already_in_library(client, db_session, stub
         "reading_status": "want_to_read",
     }
     first = await client.post("/api/goodreads/resolve", json=payload)
+    assert first.status_code == 200
     assert first.json()["status"] == "imported"
 
     second = await client.post("/api/goodreads/resolve", json=payload)
+    assert second.status_code == 200
     assert second.json()["status"] == "already_in_library"
 
     user_id = await _user_id(db_session)

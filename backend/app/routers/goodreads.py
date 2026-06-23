@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
@@ -267,7 +268,10 @@ async def import_goodreads_csv(
         isbn = explicit_isbn or search_match.get("isbn")
 
         rating_str = row.get("My Rating", "0").strip()
-        rating = int(rating_str) if rating_str and rating_str != "0" else None
+        try:
+            rating = int(rating_str) if rating_str and rating_str != "0" else None
+        except ValueError:
+            rating = None
         if rating is not None and not (1 <= rating <= 5):
             rating = None
 
@@ -427,7 +431,13 @@ async def resolve_goodreads_match(
         )
         book.genres = await _get_or_create_genres(db, genre_names)
         db.add(book)
-        await db.flush()
+        try:
+            await db.flush()
+        except IntegrityError:
+            # Another concurrent request created a Book with this ISBN first.
+            await db.rollback()
+            result = await db.execute(select(Book).where(Book.isbn == isbn))
+            book = result.scalar_one()
 
     existing = await db.execute(
         select(UserBook).where(UserBook.user_id == user.id, UserBook.book_id == book.id)
@@ -446,5 +456,11 @@ async def resolve_goodreads_match(
         date_finished=now if data.reading_status.value == "finished" else None,
     )
     db.add(ub)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        # Another concurrent request already added this book to the user's
+        # library first — that's the same end state, so treat it as success.
+        await db.rollback()
+        return {"title": book.title, "status": "already_in_library"}
     return {"title": book.title, "status": "imported"}

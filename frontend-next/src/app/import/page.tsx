@@ -139,7 +139,7 @@ export default function ImportPage() {
             </div>
           </div>
 
-          {result.needs_review > 0 && (
+          {result.needs_review - resolvedIndices.size > 0 && (
             <div className="card p-6">
               <h2 className="text-lg font-serif font-bold text-stone-900 dark:text-gray-100 mb-1">Needs Review</h2>
               <p className="text-sm text-stone-500 dark:text-gray-400 mb-4">

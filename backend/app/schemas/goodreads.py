@@ -17,5 +17,5 @@ class GoodreadsResolveMatch(BaseModel):
     isbn: str
     reading_status: ReadingStatus = ReadingStatus.WANT_TO_READ
     rating: int | None = Field(default=None, ge=1, le=5)
-    page_count: int | None = None
+    page_count: int | None = Field(default=None, ge=0)
     publication_date: datetime.date | None = None

@@ -138,7 +138,7 @@ export interface GoodreadsPendingMatch {
 
 export interface GoodreadsImportRowResult {
   title: string;
-  status: string;
+  status: 'imported' | 'skipped' | 'already_in_library' | 'needs_review' | 'error';
   error?: string;
   pending?: GoodreadsPendingMatch;
 }
