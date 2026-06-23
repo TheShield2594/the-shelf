@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
@@ -14,10 +15,12 @@ from ..models.user import User
 from ..models.book import Book
 from ..models.user_book import UserBook
 from ..auth import get_current_user
+from ..schemas.goodreads import GoodreadsResolveMatch
 from .books import (
     _openlibrary_get,
     _fetch_google_books_enrichment,
     _fetch_openlibrary_author_bio,
+    _extract_subject_names,
     _clean_genre_names,
     _get_or_create_genres,
     _parse_loose_date,
@@ -223,7 +226,12 @@ async def import_goodreads_csv(
         explicit_isbn = clean_isbn(row.get("ISBN", "")) or clean_isbn(row.get("ISBN13", ""))
         search_match = search_results.get(idx, {})
         isbn = explicit_isbn or search_match.get("isbn")
-        if isbn and isbn in existing_books_map:
+        if not isbn:
+            # No full match (no ISBN from the CSV or from the OpenLibrary
+            # search fallback) — this row needs manual review, so skip
+            # enrichment entirely rather than spending a round-trip on it.
+            continue
+        if isbn in existing_books_map:
             continue
         author = row.get("Author", "").strip()
         enrich_tasks[idx] = asyncio.create_task(
@@ -244,6 +252,7 @@ async def import_goodreads_csv(
     imported = 0
     skipped = 0
     errors = 0
+    needs_review = 0
     results = []
 
     for idx, row in enumerate(rows):
@@ -253,36 +262,53 @@ async def import_goodreads_csv(
             results.append({"title": "(empty)", "status": "skipped"})
             continue
 
+        author = row.get("Author", "").strip()
+        explicit_isbn = clean_isbn(row.get("ISBN", "")) or clean_isbn(row.get("ISBN13", ""))
+        search_match = search_results.get(idx, {})
+        isbn = explicit_isbn or search_match.get("isbn")
+
+        rating_str = row.get("My Rating", "0").strip()
+        try:
+            rating = int(rating_str) if rating_str and rating_str != "0" else None
+        except ValueError:
+            rating = None
+        if rating is not None and not (1 <= rating <= 5):
+            rating = None
+
+        shelf = row.get("Exclusive Shelf", "to-read").strip()
+        status = STATUS_MAP.get(shelf, "want_to_read")
+
+        if not isbn:
+            # Neither the CSV nor the OpenLibrary search fallback resolved an
+            # ISBN, so this isn't a full match — surface it for the user to
+            # manually search and pick the right book instead of importing a
+            # bare title/author stub with no cover or metadata.
+            needs_review += 1
+            results.append({
+                "title": title,
+                "status": "needs_review",
+                "pending": {
+                    "title": title,
+                    "author": author or "Unknown",
+                    "reading_status": status,
+                    "rating": rating,
+                    "page_count": _csv_page_count(row),
+                    "publication_date": _csv_publication_date(row),
+                },
+            })
+            continue
+
         row_status = None
         try:
             # Use savepoint isolation so an IntegrityError on one row
             # doesn't invalidate the session for remaining rows
             async with db.begin_nested():
-                author = row.get("Author", "").strip()
-                isbn = clean_isbn(row.get("ISBN", "")) or clean_isbn(
-                    row.get("ISBN13", "")
-                )
-                search_match = search_results.get(idx, {})
-                isbn = isbn or search_match.get("isbn")
-
-                rating_str = row.get("My Rating", "0").strip()
-                rating = (
-                    int(rating_str) if rating_str and rating_str != "0" else None
-                )
-                if rating is not None and not (1 <= rating <= 5):
-                    rating = None
-
-                shelf = row.get("Exclusive Shelf", "to-read").strip()
-                status = STATUS_MAP.get(shelf, "want_to_read")
-
                 # Use pre-fetched book from batch lookup
-                book = existing_books_map.get(isbn) if isbn else None
+                book = existing_books_map.get(isbn)
 
                 if not book:
                     cover_url = search_match.get("cover_url") or (
                         f"https://covers.openlibrary.org/b/isbn/{isbn}-M.jpg"
-                        if isbn
-                        else None
                     )
                     enrichment = enrich_results.get(idx, {})
                     book = Book(
@@ -301,8 +327,7 @@ async def import_goodreads_csv(
                     book.genres = await _get_or_create_genres(db, enrichment.get("genre_names", []))
                     db.add(book)
                     await db.flush()
-                    if isbn:
-                        existing_books_map[isbn] = book
+                    existing_books_map[isbn] = book
 
                 # Check if already in user's library (using pre-fetched set)
                 if book.id in existing_user_books:
@@ -340,6 +365,102 @@ async def import_goodreads_csv(
         "imported": imported,
         "skipped": skipped,
         "errors": errors,
-        "total": imported + skipped + errors,
+        "needs_review": needs_review,
+        "total": imported + skipped + errors + needs_review,
         "results": results,
     }
+
+
+@router.post("/resolve")
+async def resolve_goodreads_match(
+    data: GoodreadsResolveMatch,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Finish importing a row the CSV import couldn't fully match.
+
+    Takes the ISBN of a book the user picked via manual search (e.g. against
+    `/api/books/search-external`) plus the reading status/rating/etc. carried
+    over from the original CSV row, and creates the book (if it isn't already
+    in the catalog) and the user's library entry for it.
+    """
+    isbn = clean_isbn(data.isbn)
+    if not isbn:
+        raise HTTPException(status_code=400, detail="A valid ISBN is required")
+
+    result = await db.execute(select(Book).where(Book.isbn == isbn))
+    book = result.scalar_one_or_none()
+
+    if not book:
+        ol_data = await _openlibrary_get(
+            "https://openlibrary.org/api/books.json",
+            params={"bibkeys": f"ISBN:{isbn}", "format": "data", "jscmd": "data"},
+        )
+        ol = ol_data.get(f"ISBN:{isbn}", {})
+        title = ol.get("title") or data.title
+        authors_raw = ol.get("authors", [])
+        author = ", ".join(a.get("name", "") for a in authors_raw) or data.author
+        cover_url = ol.get("cover", {}).get("large", ol.get("cover", {}).get("medium")) or (
+            f"https://covers.openlibrary.org/b/isbn/{isbn}-M.jpg"
+        )
+        desc = ol.get("notes") if isinstance(ol.get("notes"), str) else None
+        pub_date = _parse_loose_date(ol.get("publish_date")) or data.publication_date
+        page_count = ol.get("number_of_pages") or data.page_count
+        subjects = _extract_subject_names(ol.get("subjects"))
+        author_url = authors_raw[0].get("url") if authors_raw else None
+
+        google = await _fetch_google_books_enrichment(isbn, title, author)
+        author_bio = await _fetch_openlibrary_author_bio(author_url)
+        desc = desc or google.get("description")
+        pub_date = pub_date or _parse_loose_date(google.get("published_date"))
+        page_count = page_count or google.get("page_count")
+        genre_names = _clean_genre_names(subjects, google.get("categories", []))
+
+        book = Book(
+            title=title,
+            author=author,
+            author_bio=author_bio,
+            isbn=isbn,
+            description=desc,
+            cover_url=cover_url,
+            publication_date=pub_date,
+            page_count=page_count,
+            external_rating=google.get("rating"),
+            external_rating_count=google.get("rating_count"),
+            buy_link=google.get("buy_link"),
+        )
+        book.genres = await _get_or_create_genres(db, genre_names)
+        db.add(book)
+        try:
+            await db.flush()
+        except IntegrityError:
+            # Another concurrent request created a Book with this ISBN first.
+            await db.rollback()
+            result = await db.execute(select(Book).where(Book.isbn == isbn))
+            book = result.scalar_one()
+
+    existing = await db.execute(
+        select(UserBook).where(UserBook.user_id == user.id, UserBook.book_id == book.id)
+    )
+    if existing.scalar_one_or_none():
+        await db.commit()
+        return {"title": book.title, "status": "already_in_library"}
+
+    now = datetime.now(timezone.utc)
+    ub = UserBook(
+        user_id=user.id,
+        book_id=book.id,
+        status=data.reading_status.value,
+        rating=data.rating,
+        date_started=now if data.reading_status.value == "currently_reading" else None,
+        date_finished=now if data.reading_status.value == "finished" else None,
+    )
+    db.add(ub)
+    try:
+        await db.commit()
+    except IntegrityError:
+        # Another concurrent request already added this book to the user's
+        # library first — that's the same end state, so treat it as success.
+        await db.rollback()
+        return {"title": book.title, "status": "already_in_library"}
+    return {"title": book.title, "status": "imported"}

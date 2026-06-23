@@ -11,6 +11,8 @@ import type {
   UserBook,
   APIError,
   GoodreadsImportResult,
+  GoodreadsPendingMatch,
+  GoodreadsResolveResult,
   ISBNDetailLookupResult,
   GamificationStats,
   ReadingSessionOut,
@@ -262,6 +264,19 @@ class APIClient {
       throw new Error(err.detail);
     }
     return response.json();
+  }
+
+  async resolveGoodreadsMatch(
+    pending: GoodreadsPendingMatch,
+    isbn: string
+  ): Promise<GoodreadsResolveResult> {
+    const res = await this.request<GoodreadsResolveResult>('/api/goodreads/resolve', {
+      method: 'POST',
+      body: JSON.stringify({ ...pending, isbn }),
+    });
+    this.invalidateCache('library');
+    this.invalidateCache('books');
+    return res;
   }
 
   // Multi-dimensional ratings

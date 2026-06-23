@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { useAuth } from '@/components/AuthProvider';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { GoodreadsReviewRow } from '@/components/GoodreadsReviewRow';
 import type { GoodreadsImportResult } from '@/types';
 
 export default function ImportPage() {
@@ -14,7 +15,14 @@ export default function ImportPage() {
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<GoodreadsImportResult | null>(null);
   const [error, setError] = useState('');
+  const [resolvedIndices, setResolvedIndices] = useState<Set<number>>(new Set());
+  const [resolvedCounts, setResolvedCounts] = useState({ imported: 0, already_in_library: 0 });
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleRowResolved = (idx: number, status: 'imported' | 'already_in_library') => {
+    setResolvedIndices((prev) => new Set(prev).add(idx));
+    setResolvedCounts((prev) => ({ ...prev, [status]: prev[status] + 1 }));
+  };
 
   useEffect(() => {
     if (authLoading) return;
@@ -38,6 +46,8 @@ export default function ImportPage() {
     try {
       const res = await api.importGoodreads(file);
       setResult(res);
+      setResolvedIndices(new Set());
+      setResolvedCounts({ imported: 0, already_in_library: 0 });
     } catch (err: any) {
       setError(err.message || 'Import failed');
     } finally {
@@ -86,38 +96,69 @@ export default function ImportPage() {
       )}
 
       {result ? (
-        <div className="card p-6">
-          <h2 className="text-xl font-serif font-bold text-stone-900 dark:text-gray-100 mb-4">Import Complete</h2>
-          <div className="grid grid-cols-3 gap-4 mb-6">
-            <div className="text-center">
-              <p className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">{result.imported}</p>
-              <p className="text-xs text-stone-500 dark:text-gray-400">Imported</p>
+        <div className="space-y-4">
+          <div className="card p-6">
+            <h2 className="text-xl font-serif font-bold text-stone-900 dark:text-gray-100 mb-4">Import Complete</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+              <div className="text-center">
+                <p className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">{result.imported + resolvedCounts.imported}</p>
+                <p className="text-xs text-stone-500 dark:text-gray-400">Imported</p>
+              </div>
+              <div className="text-center">
+                <p className="text-3xl font-bold text-sky-600 dark:text-sky-400">{result.needs_review - resolvedIndices.size}</p>
+                <p className="text-xs text-stone-500 dark:text-gray-400">Needs Review</p>
+              </div>
+              <div className="text-center">
+                <p className="text-3xl font-bold text-amber-600 dark:text-amber-400">{result.skipped + resolvedCounts.already_in_library}</p>
+                <p className="text-xs text-stone-500 dark:text-gray-400">Skipped</p>
+              </div>
+              <div className="text-center">
+                <p className="text-3xl font-bold text-red-600 dark:text-red-400">{result.errors}</p>
+                <p className="text-xs text-stone-500 dark:text-gray-400">Errors</p>
+              </div>
             </div>
-            <div className="text-center">
-              <p className="text-3xl font-bold text-amber-600 dark:text-amber-400">{result.skipped}</p>
-              <p className="text-xs text-stone-500 dark:text-gray-400">Skipped</p>
-            </div>
-            <div className="text-center">
-              <p className="text-3xl font-bold text-red-600 dark:text-red-400">{result.errors}</p>
-              <p className="text-xs text-stone-500 dark:text-gray-400">Errors</p>
+            {result.results.length > 0 && (
+              <div className="max-h-60 overflow-y-auto space-y-1 mb-4">
+                {result.results.map((r, i) => {
+                  const status = resolvedIndices.has(i) ? 'imported' : r.status;
+                  if (r.status === 'needs_review') return null;
+                  return (
+                    <div key={i} className="flex items-center justify-between text-sm py-1 border-b border-stone-100 dark:border-gray-800 last:border-0">
+                      <span className="text-stone-600 dark:text-gray-400 truncate flex-1">{r.title}</span>
+                      <span className={`text-xs ml-2 ${status === 'imported' ? 'text-emerald-500' : status === 'skipped' || status === 'already_in_library' ? 'text-amber-500' : 'text-red-500'}`}>
+                        {status}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <button onClick={() => router.push('/library')} className="btn-primary text-sm">View Library</button>
+              <button onClick={() => { setResult(null); setFile(null); }} className="btn-secondary text-sm">Import Another</button>
             </div>
           </div>
-          {result.results.length > 0 && (
-            <div className="max-h-60 overflow-y-auto space-y-1 mb-4">
-              {result.results.map((r, i) => (
-                <div key={i} className="flex items-center justify-between text-sm py-1 border-b border-stone-100 dark:border-gray-800 last:border-0">
-                  <span className="text-stone-600 dark:text-gray-400 truncate flex-1">{r.title}</span>
-                  <span className={`text-xs ml-2 ${r.status === 'imported' ? 'text-emerald-500' : r.status === 'skipped' || r.status === 'already_in_library' ? 'text-amber-500' : 'text-red-500'}`}>
-                    {r.status}
-                  </span>
-                </div>
-              ))}
+
+          {result.needs_review - resolvedIndices.size > 0 && (
+            <div className="card p-6">
+              <h2 className="text-lg font-serif font-bold text-stone-900 dark:text-gray-100 mb-1">Needs Review</h2>
+              <p className="text-sm text-stone-500 dark:text-gray-400 mb-4">
+                These books couldn&apos;t be fully matched. Search for each one and pick the correct match to add it to your library.
+              </p>
+              <div>
+                {result.results.map((r, i) => {
+                  if (r.status !== 'needs_review' || !r.pending || resolvedIndices.has(i)) return null;
+                  return (
+                    <GoodreadsReviewRow
+                      key={i}
+                      pending={r.pending}
+                      onResolved={(status) => handleRowResolved(i, status)}
+                    />
+                  );
+                })}
+              </div>
             </div>
           )}
-          <div className="flex gap-2">
-            <button onClick={() => router.push('/library')} className="btn-primary text-sm">View Library</button>
-            <button onClick={() => { setResult(null); setFile(null); }} className="btn-secondary text-sm">Import Another</button>
-          </div>
         </div>
       ) : (
         <div>

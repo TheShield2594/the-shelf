@@ -127,12 +127,34 @@ export interface APIError {
   detail: string;
 }
 
+export interface GoodreadsPendingMatch {
+  title: string;
+  author: string;
+  reading_status: 'want_to_read' | 'currently_reading' | 'finished' | 'dnf';
+  rating: number | null;
+  page_count: number | null;
+  publication_date: string | null;
+}
+
+export interface GoodreadsImportRowResult {
+  title: string;
+  status: 'imported' | 'skipped' | 'already_in_library' | 'needs_review' | 'error';
+  error?: string;
+  pending?: GoodreadsPendingMatch;
+}
+
 export interface GoodreadsImportResult {
   imported: number;
   skipped: number;
   errors: number;
+  needs_review: number;
   total: number;
-  results: { title: string; status: string; error?: string }[];
+  results: GoodreadsImportRowResult[];
+}
+
+export interface GoodreadsResolveResult {
+  title: string;
+  status: 'imported' | 'already_in_library';
 }
 
 export interface ISBNDetailLookupResult {
