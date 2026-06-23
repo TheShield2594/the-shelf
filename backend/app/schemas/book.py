@@ -112,3 +112,8 @@ class ReviewOut(BaseModel):
 class OpenLibraryImport(BaseModel):
     query: str
     isbn: bool = False
+
+
+class RecommendationOut(BaseModel):
+    book: BookSummary
+    reason: str

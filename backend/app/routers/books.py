@@ -1,6 +1,7 @@
 import asyncio
 import datetime
 import re
+import time
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func, or_
@@ -25,8 +26,11 @@ from ..schemas.book import (
     BookSummary,
     ContentRatingAvg,
     OpenLibraryImport,
+    RecommendationOut,
 )
-from ..auth import get_current_admin_user, get_current_user_optional
+from ..schemas.trending import TrendingBookOut, TrendingListOut, TrendingResponse
+from ..services.recommendations import get_recommendations_for_user
+from ..auth import get_current_admin_user, get_current_user, get_current_user_optional
 
 router = APIRouter(prefix="/api/books", tags=["books"])
 
@@ -402,6 +406,150 @@ async def search_external(
             }
         )
     return books
+
+
+# ---------------------------------------------------------------------------
+# Trending — NYT Best Sellers (optional; requires NYT_BOOKS_API_KEY)
+# ---------------------------------------------------------------------------
+
+# NYT bestseller lists only update weekly, and the Books API is capped at
+# 1,000 requests/day (per https://github.com/nytimes/public_api_specs), so
+# the raw overview response is cached in-process well past any plausible
+# page-load frequency.
+_NYT_CACHE_TTL_SECONDS = 6 * 60 * 60
+_nyt_cache: dict | None = None
+_nyt_cache_time: float = 0.0
+_nyt_cache_lock = asyncio.Lock()
+
+# Curated subset of NYT's ~50 current lists, in display order. Kept small so
+# the page stays focused rather than mirroring NYT's full site.
+_NYT_DEFAULT_LISTS = {
+    "combined-print-and-e-book-fiction": "Fiction",
+    "combined-print-and-e-book-nonfiction": "Nonfiction",
+}
+
+
+async def _fetch_nyt_overview() -> dict:
+    global _nyt_cache, _nyt_cache_time
+    now = time.monotonic()
+    if _nyt_cache is not None and now - _nyt_cache_time < _NYT_CACHE_TTL_SECONDS:
+        return _nyt_cache
+
+    async with _nyt_cache_lock:
+        # Re-check: another request may have refreshed the cache while we
+        # were waiting for the lock.
+        now = time.monotonic()
+        if _nyt_cache is not None and now - _nyt_cache_time < _NYT_CACHE_TTL_SECONDS:
+            return _nyt_cache
+
+        client = await get_http_client()
+        try:
+            resp = await client.get(
+                "https://api.nytimes.com/svc/books/v3/lists/overview.json",
+                params={"api-key": settings.nyt_books_api_key},
+            )
+        except httpx.HTTPError:
+            raise HTTPException(status_code=502, detail="NYT Books service unavailable")
+        if resp.status_code != 200:
+            raise HTTPException(status_code=502, detail="NYT Books service unavailable")
+        try:
+            data = resp.json()
+        except Exception:
+            raise HTTPException(status_code=502, detail="Failed to parse NYT Books response")
+
+        _nyt_cache = data
+        _nyt_cache_time = now
+        return data
+
+
+@router.get("/trending", response_model=TrendingResponse)
+async def get_trending(db: AsyncSession = Depends(get_db)):
+    """Currently trending books, sourced from the NYT Best Sellers lists.
+
+    This is an optional, self-hosted-friendly feature: if NYT_BOOKS_API_KEY
+    isn't configured, this returns enabled=False rather than erroring, so
+    instances that skip the key just see the feature quietly disabled.
+    """
+    if not settings.nyt_books_api_key:
+        return TrendingResponse(enabled=False, lists=[])
+
+    data = await _fetch_nyt_overview()
+    lists_by_encoded = {
+        lst.get("list_name_encoded"): lst for lst in data.get("results", {}).get("lists", [])
+    }
+    selected = [
+        (encoded, display, lists_by_encoded[encoded])
+        for encoded, display in _NYT_DEFAULT_LISTS.items()
+        if encoded in lists_by_encoded
+    ]
+
+    isbns = {
+        isbn
+        for _, _, lst in selected
+        for b in lst.get("books", [])
+        if (isbn := b.get("primary_isbn13") or b.get("primary_isbn10"))
+    }
+
+    # Match against locally-known books so cards can link to the shelf's own
+    # book page instead of always treating NYT entries as external.
+    book_id_by_isbn: dict[str, int] = {}
+    if isbns:
+        result = await db.execute(select(Book.id, Book.isbn).where(Book.isbn.in_(isbns)))
+        book_id_by_isbn = {isbn: bid for bid, isbn in result.all()}
+
+    out_lists = []
+    for encoded, display, lst in selected:
+        books_out = []
+        for b in lst.get("books", []):
+            isbn = b.get("primary_isbn13") or b.get("primary_isbn10")
+            books_out.append(
+                TrendingBookOut(
+                    title=b.get("title", ""),
+                    author=b.get("author", ""),
+                    isbn=isbn,
+                    cover_url=b.get("book_image") or None,
+                    description=b.get("description") or None,
+                    buy_link=b.get("amazon_product_url") or None,
+                    rank=b.get("rank", 0),
+                    weeks_on_list=b.get("weeks_on_list", 0),
+                    book_id=book_id_by_isbn.get(isbn) if isbn else None,
+                )
+            )
+        out_lists.append(
+            TrendingListOut(list_name=encoded, display_name=display, books=books_out)
+        )
+
+    return TrendingResponse(enabled=True, lists=out_lists)
+
+
+# ---------------------------------------------------------------------------
+# Recommendations — personalized, based on the user's own finished+rated books
+# ---------------------------------------------------------------------------
+
+
+@router.get("/recommendations", response_model=list[RecommendationOut])
+async def get_recommendations(
+    limit: int = Query(12, ge=1, le=50),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Books similar to what the current user has finished and rated highly.
+
+    Returns an empty list rather than erroring if the user hasn't rated
+    enough books yet — there's simply nothing to base suggestions on.
+    """
+    results = await get_recommendations_for_user(db, current_user.id, limit=limit)
+
+    book_ids = [book.id for book, _ in results]
+    stats = await _compute_batch_stats(db, book_ids)
+
+    return [
+        RecommendationOut(
+            book=_book_to_summary(book, *stats.get(book.id, (None, 0, None))),
+            reason=reason,
+        )
+        for book, reason in results
+    ]
 
 
 # ---------------------------------------------------------------------------

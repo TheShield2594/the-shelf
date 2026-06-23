@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 60 * 24 * 7  # 1 week
     cors_origins: str = "http://localhost:3000"
     google_books_api_key: str | None = None
+    nyt_books_api_key: str | None = None
     cookie_secure: bool = False
 
     # Password reset email. If smtp_host is unset, password reset requests

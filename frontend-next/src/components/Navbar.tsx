@@ -8,6 +8,8 @@ import { useTheme } from './ThemeProvider';
 
 const navLinks = [
   { href: '/browse', label: 'Browse' },
+  { href: '/trending', label: 'Trending' },
+  { href: '/recommendations', label: 'For You' },
   { href: '/library', label: 'Library' },
   { href: '/scan', label: 'Scan' },
   { href: '/import', label: 'Import' },
