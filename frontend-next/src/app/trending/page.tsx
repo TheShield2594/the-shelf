@@ -11,12 +11,12 @@ import type { BookSummary, TrendingBook, TrendingResponse } from '@/types';
 
 function toBookSummary(b: TrendingBook): BookSummary {
   return {
-    id: b.book_id,
+    id: b.book_id ?? undefined,
     title: b.title,
     author: b.author,
-    isbn: b.isbn,
-    description: b.description,
-    cover_url: b.cover_url,
+    isbn: b.isbn ?? undefined,
+    description: b.description ?? undefined,
+    cover_url: b.cover_url ?? undefined,
     genres: [],
     rating_count: 0,
   };
@@ -28,6 +28,7 @@ export default function TrendingPage() {
   const { showToast } = useToast();
   const [data, setData] = useState<TrendingResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [importing, setImporting] = useState<string | null>(null);
   const [importedKeys, setImportedKeys] = useState<Set<string>>(new Set());
   const [previewBook, setPreviewBook] = useState<BookSummary | null>(null);
@@ -36,7 +37,7 @@ export default function TrendingPage() {
     api
       .getTrending()
       .then(setData)
-      .catch(() => setData({ enabled: false, lists: [] }))
+      .catch(() => setError(true))
       .finally(() => setLoading(false));
   }, []);
 
@@ -46,8 +47,8 @@ export default function TrendingPage() {
       await api.createBook({
         title: b.title,
         author: b.author,
-        isbn: b.isbn,
-        cover_url: b.cover_url,
+        isbn: b.isbn ?? undefined,
+        cover_url: b.cover_url ?? undefined,
       });
       setImportedKeys((prev) => new Set(prev).add(bookKey(b)));
       showToast(`Added "${b.title}" to your shelf`, 'success');
@@ -62,6 +63,20 @@ export default function TrendingPage() {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <LoadingSpinner label="Loading trending books..." />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <h1 className="text-2xl font-serif font-bold text-stone-900 dark:text-gray-100 mb-6">
+          Trending Books
+        </h1>
+        <EmptyState
+          title="Couldn't load trending books"
+          description="Something went wrong fetching the bestseller lists. Please try again later."
+        />
       </div>
     );
   }

@@ -15,6 +15,7 @@ export default function RecommendationsPage() {
   const { user, loading: authLoading } = useAuth();
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     if (authLoading) return;
@@ -22,10 +23,11 @@ export default function RecommendationsPage() {
       router.push('/login');
       return;
     }
+    setError(false);
     api
       .getRecommendations()
       .then(setRecommendations)
-      .catch(() => setRecommendations([]))
+      .catch(() => setError(true))
       .finally(() => setLoading(false));
   }, [user, authLoading]);
 
@@ -42,6 +44,11 @@ export default function RecommendationsPage() {
 
       {loading ? (
         <LoadingSpinner label="Finding books you might like..." />
+      ) : error ? (
+        <EmptyState
+          title="Couldn't load recommendations"
+          description="Something went wrong fetching your recommendations. Please try again later."
+        />
       ) : recommendations.length === 0 ? (
         <EmptyState
           title="No recommendations yet"

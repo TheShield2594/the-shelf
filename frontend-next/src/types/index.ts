@@ -165,13 +165,13 @@ export interface ISBNDetailLookupResult {
 export interface TrendingBook {
   title: string;
   author: string;
-  isbn?: string;
-  cover_url?: string;
-  description?: string;
-  buy_link?: string;
+  isbn?: string | null;
+  cover_url?: string | null;
+  description?: string | null;
+  buy_link?: string | null;
   rank: number;
   weeks_on_list: number;
-  book_id?: number;
+  book_id?: number | null;
 }
 
 export interface TrendingList {

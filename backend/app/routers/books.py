@@ -419,6 +419,7 @@ async def search_external(
 _NYT_CACHE_TTL_SECONDS = 6 * 60 * 60
 _nyt_cache: dict | None = None
 _nyt_cache_time: float = 0.0
+_nyt_cache_lock = asyncio.Lock()
 
 # Curated subset of NYT's ~50 current lists, in display order. Kept small so
 # the page stays focused rather than mirroring NYT's full site.
@@ -434,24 +435,31 @@ async def _fetch_nyt_overview() -> dict:
     if _nyt_cache is not None and now - _nyt_cache_time < _NYT_CACHE_TTL_SECONDS:
         return _nyt_cache
 
-    client = await get_http_client()
-    try:
-        resp = await client.get(
-            "https://api.nytimes.com/svc/books/v3/lists/overview.json",
-            params={"api-key": settings.nyt_books_api_key},
-        )
-    except httpx.HTTPError:
-        raise HTTPException(status_code=502, detail="NYT Books service unavailable")
-    if resp.status_code != 200:
-        raise HTTPException(status_code=502, detail="NYT Books service unavailable")
-    try:
-        data = resp.json()
-    except Exception:
-        raise HTTPException(status_code=502, detail="Failed to parse NYT Books response")
+    async with _nyt_cache_lock:
+        # Re-check: another request may have refreshed the cache while we
+        # were waiting for the lock.
+        now = time.monotonic()
+        if _nyt_cache is not None and now - _nyt_cache_time < _NYT_CACHE_TTL_SECONDS:
+            return _nyt_cache
 
-    _nyt_cache = data
-    _nyt_cache_time = now
-    return data
+        client = await get_http_client()
+        try:
+            resp = await client.get(
+                "https://api.nytimes.com/svc/books/v3/lists/overview.json",
+                params={"api-key": settings.nyt_books_api_key},
+            )
+        except httpx.HTTPError:
+            raise HTTPException(status_code=502, detail="NYT Books service unavailable")
+        if resp.status_code != 200:
+            raise HTTPException(status_code=502, detail="NYT Books service unavailable")
+        try:
+            data = resp.json()
+        except Exception:
+            raise HTTPException(status_code=502, detail="Failed to parse NYT Books response")
+
+        _nyt_cache = data
+        _nyt_cache_time = now
+        return data
 
 
 @router.get("/trending", response_model=TrendingResponse)
@@ -521,7 +529,7 @@ async def get_trending(db: AsyncSession = Depends(get_db)):
 
 @router.get("/recommendations", response_model=list[RecommendationOut])
 async def get_recommendations(
-    limit: int = Query(12, le=50),
+    limit: int = Query(12, ge=1, le=50),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
